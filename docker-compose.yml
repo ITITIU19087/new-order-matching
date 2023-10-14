@@ -1,0 +1,11 @@
+version: "1.0"
+
+services:
+  management-center:
+    container_name: hazelcast-management-center
+    image: hazelcast/management-center:latest
+    ports:
+      - "8080:8080"
+    environment:
+      - MC_CLUSTER_NAME=order-matching-system
+      - MC_CLUSTER_MEMBERS=hazelcast:5701

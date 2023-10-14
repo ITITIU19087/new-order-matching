@@ -34,4 +34,9 @@ public class OrderController {
     public Double getBestPriceOfSide (@RequestParam String side){
         return tradeService.getBestPriceOfSide(side);
     }
+
+    @GetMapping("group-order")
+    public List<Order> getAllOrderAtPrice(@RequestParam String side){
+        return tradeService.getOrdersAtPrice(side, tradeService.getBestPriceOfSide(side));
+    }
 }

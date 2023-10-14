@@ -1,6 +1,5 @@
 package com.ordermatching.service.hazelcast;
 
-import com.hazelcast.core.Hazelcast;
 import com.hazelcast.map.IMap;
 import com.ordermatching.config.HazelcastConfig;
 import com.ordermatching.entity.Order;
@@ -56,5 +55,15 @@ public class TradeService {
         else{
             return Collections.min(priceMap.keySet());
         }
+    }
+
+    public List<Order> getOrdersAtPrice(String side, Double price){
+        Map<Double, List<Order>> priceMap = groupOrderByPrice(side);
+        for (Double orderPrice : priceMap.keySet()){
+            if (orderPrice.equals(price)){
+                return priceMap.get(orderPrice);
+            }
+        }
+        return null;
     }
 }

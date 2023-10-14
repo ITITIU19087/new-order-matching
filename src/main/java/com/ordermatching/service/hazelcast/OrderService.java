@@ -15,7 +15,7 @@ public class OrderService {
     @Autowired
     private HazelcastConfig hazelcastConfig;
 
-    public void createOrder(OrderDto orderDto){
+    public Order createOrder(OrderDto orderDto){
         IMap<String, Order> orderMap = hazelcastConfig.hazelcastInstance().getMap("orders");
         Order order = new Order();
         String orderId = UUID.randomUUID().toString();
@@ -26,5 +26,7 @@ public class OrderService {
         order.setOrderTime(LocalDateTime.now());
         order.setStatus("Success");
         orderMap.put(order.getUUID(), order);
+
+        return order;
     }
 }

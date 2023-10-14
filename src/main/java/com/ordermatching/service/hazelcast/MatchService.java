@@ -64,10 +64,12 @@ public class MatchService {
         Map<Double, List<Order>> priceMap = groupOrderByPrice(side);
         for (Double orderPrice : priceMap.keySet()){
             if (orderPrice.equals(price)){
-                return priceMap.get(orderPrice);
+                List<Order> orderList = priceMap.get(orderPrice);
+                orderList.sort(Comparator.comparing(Order::getOrderTime));
+                return orderList;
             }
         }
-        return null;
+        return Collections.emptyList();
     }
     public void executeTrade(Order buyOrder, Order sellOrder){
         Double matchedQuantity = buyOrder.getQuantity() - sellOrder.getQuantity();
@@ -96,6 +98,5 @@ public class MatchService {
             tradeService.createTrade(buyOrder, sellOrder, Math.abs(matchedQuantity));
         }
     }
-
 
 }

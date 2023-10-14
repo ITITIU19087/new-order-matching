@@ -3,67 +3,28 @@ package com.ordermatching.service.hazelcast;
 import com.hazelcast.map.IMap;
 import com.ordermatching.config.HazelcastConfig;
 import com.ordermatching.entity.Order;
+import com.ordermatching.entity.Trade;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.util.*;
+import java.util.UUID;
 
 @Service
 public class TradeService {
     @Autowired
     private HazelcastConfig hazelcastConfig;
 
-    public List<Order> getAllOrders(){
-        IMap<String, Order> orderMap = hazelcastConfig.hazelcastInstance().getMap("orders");
-        return new ArrayList<>(orderMap.values());
-    }
+    public void createTrade(Order buyOrder, Order sellOrder, double matchedQuantity){
+        IMap<String, Trade> orderMap = hazelcastConfig.hazelcastInstance().getMap("trades");
+        Trade trade = new Trade();
+        String tradeUUID = UUID.randomUUID().toString();
 
-    public List<Order> getAllOrdersBySide(String side){
-        IMap<String, Order> orderMap = hazelcastConfig.hazelcastInstance().getMap("orders");
-        List<Order> orderListBySide = new ArrayList<>();
-        for (Order order: orderMap.values()){
-            if(order.getSide().equals(side)){
-                orderListBySide.add(order);
-            }
-        }
-        return orderListBySide;
-    }
+        trade.setUUID(tradeUUID);
+        trade.setBuyOrderUUID(buyOrder.getUUID());
+        trade.setSellOrderUUID(sellOrder.getUUID());
+        trade.setQuantity(matchedQuantity);
+        trade.setPrice(buyOrder.getPrice());
 
-    public Map<Double, List<Order>> groupOrderByPrice(String side){
-        IMap<String, Order> orderMap = hazelcastConfig.hazelcastInstance().getMap("orders");
-        Map<Double, List<Order>> ordersGroupedByPrice = new HashMap<>();
-
-        for (Order order : orderMap.values()) {
-            if (order.getSide().equals(side)) {
-                double price = order.getPrice();
-                List<Order> ordersWithSamePrice = ordersGroupedByPrice.getOrDefault(price, new ArrayList<>());
-                ordersWithSamePrice.add(order);
-                ordersGroupedByPrice.put(price, ordersWithSamePrice);
-            }
-        }
-        return ordersGroupedByPrice;
-    }
-
-    public Double getBestPriceOfSide(String side){
-        Map<Double, List<Order>> priceMap = groupOrderByPrice(side);
-        if (priceMap.isEmpty()){
-            return 0.0;
-        }
-        if (side.equals("BUY")){
-            return Collections.max(priceMap.keySet());
-        }
-        else{
-            return Collections.min(priceMap.keySet());
-        }
-    }
-
-    public List<Order> getOrdersAtPrice(String side, Double price){
-        Map<Double, List<Order>> priceMap = groupOrderByPrice(side);
-        for (Double orderPrice : priceMap.keySet()){
-            if (orderPrice.equals(price)){
-                return priceMap.get(orderPrice);
-            }
-        }
-        return null;
+        orderMap.put(trade.getUUID(), trade);
     }
 }

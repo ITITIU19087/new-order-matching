@@ -3,7 +3,7 @@ package com.ordermatching.controller;
 import com.ordermatching.dto.OrderDto;
 import com.ordermatching.entity.Order;
 import com.ordermatching.service.hazelcast.OrderService;
-import com.ordermatching.service.hazelcast.TradeService;
+import com.ordermatching.service.hazelcast.MatchService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -14,7 +14,7 @@ import java.util.Map;
 @RequestMapping("hazelcast")
 public class OrderController {
     @Autowired
-    private TradeService tradeService;
+    private MatchService matchService;
     @Autowired
     private OrderService orderService;
 
@@ -27,16 +27,16 @@ public class OrderController {
 
     @GetMapping("group")
     public Map<Double, List<Order>> getOrderByPriceAndSide(@RequestParam String side){
-        return tradeService.groupOrderByPrice(side);
+        return matchService.groupOrderByPrice(side);
     }
 
     @GetMapping("best-price")
     public Double getBestPriceOfSide (@RequestParam String side){
-        return tradeService.getBestPriceOfSide(side);
+        return matchService.getBestPriceOfSide(side);
     }
 
     @GetMapping("group-order")
     public List<Order> getAllOrderAtPrice(@RequestParam String side){
-        return tradeService.getOrdersAtPrice(side, tradeService.getBestPriceOfSide(side));
+        return matchService.getOrdersAtPrice(side, matchService.getBestPriceOfSide(side));
     }
 }

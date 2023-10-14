@@ -7,10 +7,7 @@ import com.ordermatching.entity.Order;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 @Service
 public class TradeService {
@@ -46,5 +43,18 @@ public class TradeService {
             }
         }
         return ordersGroupedByPrice;
+    }
+
+    public Double getBestPriceOfSide(String side){
+        Map<Double, List<Order>> priceMap = groupOrderByPrice(side);
+        if (priceMap.isEmpty()){
+            return 0.0;
+        }
+        if (side.equals("BUY")){
+            return Collections.max(priceMap.keySet());
+        }
+        else{
+            return Collections.min(priceMap.keySet());
+        }
     }
 }

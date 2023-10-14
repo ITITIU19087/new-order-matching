@@ -33,11 +33,11 @@ public class MatchService {
     }
 
     public Map<Double, List<Order>> groupOrderByPrice(String side){
-        IMap<String, Order> orderMap = hazelcastConfig.hazelcastInstance().getMap("orders");
+        List<Order> allOrderBySide = getAllOrdersBySide(side);
         Map<Double, List<Order>> ordersGroupedByPrice = new HashMap<>();
 
-        for (Order order : orderMap.values()) {
-            if (order.getSide().equals(side) && order.isMatched()) {
+        for (Order order : allOrderBySide) {
+            if (!order.isMatched()) {
                 double price = order.getPrice();
                 List<Order> ordersWithSamePrice = ordersGroupedByPrice.getOrDefault(price, new ArrayList<>());
                 ordersWithSamePrice.add(order);
@@ -96,5 +96,6 @@ public class MatchService {
             tradeService.createTrade(buyOrder, sellOrder, Math.abs(matchedQuantity));
         }
     }
+
 
 }

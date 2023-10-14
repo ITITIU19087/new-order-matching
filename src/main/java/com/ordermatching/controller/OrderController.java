@@ -1,15 +1,14 @@
 package com.ordermatching.controller;
 
 import com.ordermatching.dto.OrderDto;
+import com.ordermatching.entity.Order;
 import com.ordermatching.service.hazelcast.OrderService;
 import com.ordermatching.service.hazelcast.TradeService;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("hazelcast")
@@ -24,5 +23,10 @@ public class OrderController {
         for (OrderDto orderDto: orderDtoList) {
             orderService.createOrder(orderDto);
         }
+    }
+
+    @GetMapping("group")
+    public Map<Double, List<Order>> getOrderByPriceAndSide(@RequestParam String side){
+        return tradeService.groupOrderByPrice(side);
     }
 }

@@ -71,32 +71,69 @@ public class MatchService {
         }
         return Collections.emptyList();
     }
+
+    public void updateOrder(Order order){
+        IMap<String, Order> orderMap = hazelcastConfig.hazelcastInstance().getMap("orders");
+        Order oldOrder = orderMap.get(order.getUUID());
+
+        if (oldOrder != null){
+            oldOrder.setQuantity(order.getQuantity());
+            oldOrder.setMatched(order.isMatched());
+            orderMap.put(order.getUUID(), oldOrder);
+        }
+    }
     public void executeTrade(Order buyOrder, Order sellOrder){
-        Double matchedQuantity = buyOrder.getQuantity() - sellOrder.getQuantity();
-        if (matchedQuantity == 0){
+        Double buyQuantity = buyOrder.getQuantity();
+        Double sellQuantity = sellOrder.getQuantity();
+        if (buyQuantity - sellQuantity == 0){
             buyOrder.setMatched(true);
             buyOrder.setQuantity(0.0);
 
             sellOrder.setMatched(true);
             sellOrder.setQuantity(0.0);
 
-            tradeService.createTrade(buyOrder, sellOrder, matchedQuantity);
-        } else if (matchedQuantity > 0) {
-            buyOrder.setQuantity(matchedQuantity);
+            tradeService.createTrade(buyOrder, sellOrder, buyQuantity);
+            updateOrder(buyOrder);
+            updateOrder(sellOrder);
+        } else if (buyQuantity - sellQuantity > 0) {
+            buyOrder.setQuantity(buyQuantity - sellQuantity);
 
             sellOrder.setMatched(true);
             sellOrder.setQuantity(0.0);
 
-            tradeService.createTrade(buyOrder, sellOrder, matchedQuantity);
+            tradeService.createTrade(buyOrder, sellOrder, sellQuantity);
+            updateOrder(buyOrder);
+            updateOrder(sellOrder);
         }
         else {
             buyOrder.setMatched(true);
             buyOrder.setQuantity(0.0);
 
-            sellOrder.setQuantity(Math.abs(matchedQuantity));
+            sellOrder.setQuantity(sellQuantity - buyQuantity);
 
-            tradeService.createTrade(buyOrder, sellOrder, Math.abs(matchedQuantity));
+            tradeService.createTrade(buyOrder, sellOrder, buyQuantity);
+            updateOrder(buyOrder);
+            updateOrder(sellOrder);
         }
     }
+    public void matchOrdersUsingFifo(){
+        Double bestBuyPrice = getBestPriceOfSide("BUY");
+        Double bestSellPrice = getBestPriceOfSide("SELL");
+        if (bestBuyPrice.equals(bestSellPrice)){
+            List<Order> buyOrders = getOrdersAtPrice("BUY", bestBuyPrice);
+            List<Order> sellOrders = getOrdersAtPrice("SELL", bestSellPrice);
+            while (buyOrders.iterator().hasNext() && sellOrders.iterator().hasNext()){
+                Order buyOrder = buyOrders.iterator().next();
+                Order sellOrder = sellOrders.iterator().next();
+                executeTrade(buyOrder, sellOrder);
 
+                if(buyOrder.isMatched()){
+                    buyOrders.remove(buyOrder);
+                }
+                if(sellOrder.isMatched()){
+                    sellOrders.remove(sellOrder);
+                }
+            }
+        }
+    }
 }

@@ -20,9 +20,7 @@ public class OrderController {
 
     @PostMapping("/create")
     public void createOrder(@RequestBody List<OrderDto> orderDtoList){
-        for (OrderDto orderDto: orderDtoList) {
-            orderService.createOrder(orderDto);
-        }
+        orderService.createOrder(orderDtoList);
     }
 
     @GetMapping("group")

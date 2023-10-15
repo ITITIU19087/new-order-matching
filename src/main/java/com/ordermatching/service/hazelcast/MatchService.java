@@ -119,21 +119,41 @@ public class MatchService {
     public void matchOrdersUsingFifo(){
         Double bestBuyPrice = getBestPriceOfSide("BUY");
         Double bestSellPrice = getBestPriceOfSide("SELL");
-        if (bestBuyPrice.equals(bestSellPrice)){
-            List<Order> buyOrders = getOrdersAtPrice("BUY", bestBuyPrice);
-            List<Order> sellOrders = getOrdersAtPrice("SELL", bestSellPrice);
-            while (buyOrders.iterator().hasNext() && sellOrders.iterator().hasNext()){
-                Order buyOrder = buyOrders.iterator().next();
-                Order sellOrder = sellOrders.iterator().next();
-                executeTrade(buyOrder, sellOrder);
 
-                if(buyOrder.isMatched()){
-                    buyOrders.remove(buyOrder);
-                }
-                if(sellOrder.isMatched()){
-                    sellOrders.remove(sellOrder);
-                }
+        List<Order> buyOrders = getOrdersAtPrice("BUY", bestBuyPrice);
+        List<Order> sellOrders = getOrdersAtPrice("SELL", bestSellPrice);
+
+        xxMatch(buyOrders, sellOrders);
+    }
+
+    public void specialExecuteTrade(Order buyOrder, Order sellOrder){
+        if (buyOrder.getPrice() > sellOrder.getPrice()){
+            buyOrder.setPrice(sellOrder.getPrice());
+        }
+        else if (buyOrder.getPrice() < sellOrder.getPrice()){
+            sellOrder.setPrice(buyOrder.getPrice());
+        }
+        executeTrade(buyOrder, sellOrder);
+    }
+
+    private void xxMatch(List<Order> buyOrders, List<Order> sellOrders) {
+        while (buyOrders.iterator().hasNext() && sellOrders.iterator().hasNext()){
+            Order buyOrder = buyOrders.iterator().next();
+            Order sellOrder = sellOrders.iterator().next();
+            if (buyOrder.getPrice().equals(sellOrder.getPrice())){
+                executeTrade(buyOrder, sellOrder);
+            }
+            else {
+                specialExecuteTrade(buyOrder, sellOrder);
+            }
+
+            if(buyOrder.isMatched()){
+                buyOrders.remove(buyOrder);
+            }
+            if(sellOrder.isMatched()){
+                sellOrders.remove(sellOrder);
             }
         }
     }
+
 }

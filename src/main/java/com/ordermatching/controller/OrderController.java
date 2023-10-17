@@ -37,4 +37,20 @@ public class OrderController {
     public List<Order> getAllOrderAtPrice(@RequestParam String side){
         return matchService.getOrdersAtPrice(side, matchService.getBestPriceOfSide(side));
     }
+
+    @GetMapping("get-price")
+    public List<Double> getPriceAtSide(@RequestParam String side){
+        return matchService.getPriceAtSide(side);
+    }
+
+    @GetMapping("pro-rata")
+    public void matchProRata(){
+        matchService.matchOrdersUsingProRata();
+    }
+
+    @GetMapping("total")
+    @CrossOrigin
+    public Map<Double, Integer> getTotalOrderAtPrice(@RequestParam String side){
+        return matchService.getTotalOrderAtPrice(side);
+    }
 }

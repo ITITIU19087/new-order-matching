@@ -35,7 +35,6 @@ public class MatchService {
     public Map<Double, List<Order>> groupOrderByPrice(String side){
         List<Order> allOrderBySide = getAllOrdersBySide(side);
         Map<Double, List<Order>> ordersGroupedByPrice = new HashMap<>();
-
         for (Order order : allOrderBySide) {
             if (!order.isMatched()) {
                 double price = order.getPrice();
@@ -116,14 +115,41 @@ public class MatchService {
             updateOrder(sellOrder);
         }
     }
+
+    public List<Double> getPriceAtSide(String side){
+        List<Double> priceList = new ArrayList<>(groupOrderByPrice(side).keySet());
+        if (side.equals("BUY")){
+            Collections.sort(priceList);
+        }
+        else{
+            Collections.sort(priceList, Collections.reverseOrder());
+        }
+        return priceList;
+    }
+
     public void matchOrdersUsingFifo(){
-        Double bestBuyPrice = getBestPriceOfSide("BUY");
-        Double bestSellPrice = getBestPriceOfSide("SELL");
+        double bestBuyPrice = getBestPriceOfSide("BUY");
+        double bestSellPrice = getBestPriceOfSide("SELL");
 
         List<Order> buyOrders = getOrdersAtPrice("BUY", bestBuyPrice);
         List<Order> sellOrders = getOrdersAtPrice("SELL", bestSellPrice);
-
         xxMatch(buyOrders, sellOrders);
+
+        while (bestBuyPrice >= bestSellPrice && bestSellPrice != 0 && bestBuyPrice != 0) {
+            buyOrders = getOrdersAtPrice("BUY", bestBuyPrice);
+            sellOrders = getOrdersAtPrice("SELL", bestSellPrice);
+            xxMatch(buyOrders, sellOrders);
+
+            bestBuyPrice = getBestPriceOfSide("BUY");
+            bestSellPrice = getBestPriceOfSide("SELL");
+        }
+    }
+
+    public void matchOrdersUsingProRata() {
+        double bestBuyPrice = getBestPriceOfSide("BUY");
+        double bestSellPrice = getBestPriceOfSide("SELL");
+
+
     }
 
     public void specialExecuteTrade(Order buyOrder, Order sellOrder){
@@ -156,4 +182,15 @@ public class MatchService {
         }
     }
 
+    public Map<Double, Integer> getTotalOrderAtPrice(String side){
+        Map<Double, List<Order>> priceMap = groupOrderByPrice(side);
+        Map<Double, Integer> priceCountMap = new HashMap<>();
+
+        for (Double orderPrice : priceMap.keySet()) {
+            List<Order> orderList = priceMap.get(orderPrice);
+            int orderCount = orderList.size();
+            priceCountMap.put(orderPrice, orderCount);
+        }
+        return priceCountMap;
+    }
 }

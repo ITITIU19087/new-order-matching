@@ -145,9 +145,19 @@ public class MatchService {
         }
     }
 
+    public Double getHighestQuantityAtPrice(String side, Double price){
+        List<Order> orderList = getOrdersAtPrice(side, price);
+        Collections.sort(orderList, Comparator.comparing(Order::getQuantity));
+        return orderList.get(0).getQuantity();
+    }
+
     public void matchOrdersUsingProRata() {
         double bestBuyPrice = getBestPriceOfSide("BUY");
         double bestSellPrice = getBestPriceOfSide("SELL");
+
+        List<Order> buyOrders = getOrdersAtPrice("BUY", bestBuyPrice);
+        List<Order> sellOrders = getOrdersAtPrice("SELL", bestSellPrice);
+
 
 
     }

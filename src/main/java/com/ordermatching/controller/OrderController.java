@@ -12,9 +12,11 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("hazelcast")
+@CrossOrigin(origins = "http://localhost:3000")
 public class OrderController {
     @Autowired
     private MatchService matchService;
+
     @Autowired
     private OrderService orderService;
 
@@ -26,6 +28,11 @@ public class OrderController {
     @GetMapping("group")
     public Map<Double, List<Order>> getOrderByPriceAndSide(@RequestParam String side){
         return matchService.groupOrderByPrice(side);
+    }
+
+    @GetMapping("/service")
+    public List<Order> listOrder(){
+        return matchService.getAllOrders();
     }
 
     @GetMapping("best-price")
@@ -49,7 +56,6 @@ public class OrderController {
     }
 
     @GetMapping("total")
-    @CrossOrigin
     public Map<Double, Integer> getTotalOrderAtPrice(@RequestParam String side){
         return matchService.getTotalOrderAtPrice(side);
     }

@@ -32,6 +32,6 @@ public class OrderService {
             order.setStatus("Success");
             orderMap.put(order.getUUID(), order);
         }
-        matchService.matchOrdersUsingFifo();
+        matchService.ProRataBuy();
     }
 }

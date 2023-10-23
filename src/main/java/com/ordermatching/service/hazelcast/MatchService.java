@@ -10,6 +10,10 @@ import java.util.*;
 
 @Service
 public class MatchService {
+
+    private static final Double PRO_RATA_MIN = 150.0;
+    private static final Double PRO_RATA_MIN_ALLOCATION = 1.0;
+
     @Autowired
     private HazelcastConfig hazelcastConfig;
 
@@ -77,7 +81,9 @@ public class MatchService {
 
         if (oldOrder != null){
             oldOrder.setQuantity(order.getQuantity());
-            oldOrder.setMatched(order.isMatched());
+            if (order.getQuantity() == 0) {
+                oldOrder.setMatched(order.isMatched());
+            }
             orderMap.put(order.getUUID(), oldOrder);
         }
     }
@@ -152,14 +158,31 @@ public class MatchService {
     }
 
     public void matchOrdersUsingProRata() {
-        double bestBuyPrice = getBestPriceOfSide("BUY");
-        double bestSellPrice = getBestPriceOfSide("SELL");
+        Double bestBuyPrice = getBestPriceOfSide("BUY");
+        Double bestSellPrice = getBestPriceOfSide("SELL");
 
-        List<Order> buyOrders = getOrdersAtPrice("BUY", bestBuyPrice);
-        List<Order> sellOrders = getOrdersAtPrice("SELL", bestSellPrice);
+        Double highestBuyQuantity = getHighestQuantityAtPrice("BUY", bestBuyPrice);
+        Double highestSellQuantity = getHighestQuantityAtPrice("SELL", bestSellPrice);
+
+        if (highestBuyQuantity >= PRO_RATA_MIN || highestSellQuantity <= PRO_RATA_MIN){
+            List<Order> buyOrders = getOrdersAtPrice("BUY", bestBuyPrice);
+            List<Order> sellOrders = getOrdersAtPrice("SELL", bestSellPrice);
+        }
 
 
 
+    }
+
+
+    private int calculateMatchQuantityForProRata(Order order, double totalBuyQuantity, double totalSellQuantity) {
+        double proRataShare = order.getQuantity() / totalBuyQuantity;
+        double proRataDistribution = proRataShare * totalSellQuantity;
+
+        int matchQuantity = (int) Math.round(proRataDistribution);
+        if (proRataDistribution < PRO_RATA_MIN_ALLOCATION) {
+            matchQuantity = 0;
+        }
+        return matchQuantity;
     }
 
     public void specialExecuteTrade(Order buyOrder, Order sellOrder){

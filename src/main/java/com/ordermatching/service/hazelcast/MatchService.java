@@ -157,32 +157,75 @@ public class MatchService {
         return orderList.get(0).getQuantity();
     }
 
-    public void matchOrdersUsingProRata() {
-        Double bestBuyPrice = getBestPriceOfSide("BUY");
-        Double bestSellPrice = getBestPriceOfSide("SELL");
+    public Order getOrderByQuantity(Double quantity, String side, Double price){
+        List<Order> orderList = getOrdersAtPrice(side, price);
+        List<Order> filterList = new ArrayList<>();
 
-        Double highestBuyQuantity = getHighestQuantityAtPrice("BUY", bestBuyPrice);
-        Double highestSellQuantity = getHighestQuantityAtPrice("SELL", bestSellPrice);
-
-        if (highestBuyQuantity >= PRO_RATA_MIN || highestSellQuantity <= PRO_RATA_MIN){
-            List<Order> buyOrders = getOrdersAtPrice("BUY", bestBuyPrice);
-            List<Order> sellOrders = getOrdersAtPrice("SELL", bestSellPrice);
+        for (Order order : orderList){
+            if (order.getQuantity().equals(quantity)){
+                filterList.add(order);
+            }
         }
-
-
-
+        return filterList.get(0);
     }
 
+    public void proRataBuy(){
+        Double bestBuyPrice = getBestPriceOfSide("BUY");
+        Double highestBuyQuantity = getHighestQuantityAtPrice("BUY", bestBuyPrice);
 
-    private int calculateMatchQuantityForProRata(Order order, double totalBuyQuantity, double totalSellQuantity) {
-        double proRataShare = order.getQuantity() / totalBuyQuantity;
-        double proRataDistribution = proRataShare * totalSellQuantity;
+        List<Order> sellOrders = getOrdersAtPrice("SELL", getBestPriceOfSide("SELL"));
 
-        int matchQuantity = (int) Math.round(proRataDistribution);
-        if (proRataDistribution < PRO_RATA_MIN_ALLOCATION) {
-            matchQuantity = 0;
+        if (highestBuyQuantity >= PRO_RATA_MIN_ALLOCATION){
+            Order buyOrder = getOrderByQuantity(highestBuyQuantity, "BUY", bestBuyPrice);
+            double totalBuyQuantity = buyOrder.getQuantity();
+            double totalSellQuantity = sellOrders.stream().mapToDouble(Order::getQuantity).sum();
+            for (Order order: sellOrders){
+                double ratio = order.getQuantity() / totalSellQuantity;
+                double proratedVolume = ratio * totalBuyQuantity;
+
+                int matchQuantity = (int) Math.round(proratedVolume);
+
+                if (matchQuantity < PRO_RATA_MIN_ALLOCATION){
+                    matchQuantity = 0;
+                }
+
+                order.setQuantity(order.getQuantity() - matchQuantity);
+                buyOrder.setQuantity(buyOrder.getQuantity() - matchQuantity);
+                updateOrder(order);
+                updateOrder(buyOrder);
+                tradeService.createTrade(buyOrder, order, matchQuantity);
+            }
         }
-        return matchQuantity;
+    }
+
+    public void proRataSell(){
+        Double bestSellPrice = getBestPriceOfSide("SELL");
+        Double highestSellQuantity = getHighestQuantityAtPrice("SELL", bestSellPrice);
+
+        List<Order> buyOrders = getOrdersAtPrice("BUY", getBestPriceOfSide("BUY"));
+        if (highestSellQuantity >= PRO_RATA_MIN_ALLOCATION){
+            Order sellOrder = getOrderByQuantity(highestSellQuantity, "SELL", bestSellPrice);
+            double totalBuyQuantity = buyOrders.stream().mapToDouble(Order::getQuantity).sum();
+            double totalSellQuantity = sellOrder.getQuantity();
+            for (Order order: buyOrders){
+                double ratio = order.getQuantity() / totalBuyQuantity;
+                double proratedVolume = ratio * totalSellQuantity;
+                int matchQuantity = (int) Math.round(proratedVolume);
+
+                if (matchQuantity < PRO_RATA_MIN_ALLOCATION){
+                    matchQuantity = 0;
+                }
+                double remainBuyQuantity = order.getQuantity() - matchQuantity;
+                double remainSellQuantity = sellOrder.getQuantity() - matchQuantity;
+                order.setQuantity(order.getQuantity() - matchQuantity);
+                sellOrder.setQuantity(sellOrder.getQuantity() - matchQuantity);
+
+                updateOrder(order);
+                updateOrder(sellOrder);
+
+                tradeService.createTrade(order, sellOrder, matchQuantity);
+            }
+        }
     }
 
     public void specialExecuteTrade(Order buyOrder, Order sellOrder){

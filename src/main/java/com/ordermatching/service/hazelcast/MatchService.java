@@ -175,7 +175,7 @@ public class MatchService {
 
         List<Order> sellOrders = getOrdersAtPrice("SELL", getBestPriceOfSide("SELL"));
 
-        if (highestBuyQuantity >= PRO_RATA_MIN_ALLOCATION){
+        if (highestBuyQuantity >= PRO_RATA_MIN){
             Order buyOrder = getOrderByQuantity(highestBuyQuantity, "BUY", bestBuyPrice);
             double totalBuyQuantity = buyOrder.getQuantity();
             double totalSellQuantity = sellOrders.stream().mapToDouble(Order::getQuantity).sum();
@@ -203,27 +203,28 @@ public class MatchService {
         Double highestSellQuantity = getHighestQuantityAtPrice("SELL", bestSellPrice);
 
         List<Order> buyOrders = getOrdersAtPrice("BUY", getBestPriceOfSide("BUY"));
-        if (highestSellQuantity >= PRO_RATA_MIN_ALLOCATION){
+        if (highestSellQuantity >= PRO_RATA_MIN){
             Order sellOrder = getOrderByQuantity(highestSellQuantity, "SELL", bestSellPrice);
-            double totalBuyQuantity = buyOrders.stream().mapToDouble(Order::getQuantity).sum();
-            double totalSellQuantity = sellOrder.getQuantity();
-            for (Order order: buyOrders){
-                double ratio = order.getQuantity() / totalBuyQuantity;
-                double proratedVolume = ratio * totalSellQuantity;
-                int matchQuantity = (int) Math.round(proratedVolume);
+            if (sellOrder.getQuantity() == 0){
+                sellOrder.setMatched(true);
+            }
+                double totalBuyQuantity = buyOrders.stream().mapToDouble(Order::getQuantity).sum();
+                double totalSellQuantity = sellOrder.getQuantity();
+                for (Order order: buyOrders){
+                    double ratio = order.getQuantity() / totalBuyQuantity;
+                    double proratedVolume = ratio * totalSellQuantity;
+                    int matchQuantity = (int) Math.round(proratedVolume);
 
-                if (matchQuantity < PRO_RATA_MIN_ALLOCATION){
-                    matchQuantity = 0;
-                }
-                double remainBuyQuantity = order.getQuantity() - matchQuantity;
-                double remainSellQuantity = sellOrder.getQuantity() - matchQuantity;
-                order.setQuantity(order.getQuantity() - matchQuantity);
-                sellOrder.setQuantity(sellOrder.getQuantity() - matchQuantity);
-
-                updateOrder(order);
-                updateOrder(sellOrder);
-
-                tradeService.createTrade(order, sellOrder, matchQuantity);
+                    if (matchQuantity < PRO_RATA_MIN_ALLOCATION){
+                        matchQuantity = 0;
+                    }
+                    if (!sellOrder.isMatched()){
+                        order.setQuantity(order.getQuantity() - matchQuantity);
+                        sellOrder.setQuantity(sellOrder.getQuantity() - matchQuantity);
+                        updateOrder(order);
+                        updateOrder(sellOrder);
+                        tradeService.createTrade(order, sellOrder, matchQuantity);
+                    }
             }
         }
     }

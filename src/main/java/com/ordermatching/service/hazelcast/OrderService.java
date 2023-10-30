@@ -33,6 +33,7 @@ public class OrderService {
             orderMap.put(order.getUUID(), order);
         }
         matchService.proRataSell();
-//        matchService.matchOrdersUsingFifo();
+        matchService.proRataBuy();
+        matchService.matchOrdersUsingFifo();
     }
 }

@@ -50,10 +50,6 @@ public class OrderController {
         return matchService.getPriceAtSide(side);
     }
 
-//    @GetMapping("pro-rata")
-//    public void matchProRata(){
-//        matchService.matchOrdersUsingProRata();
-//    }
 
     @GetMapping("total")
     public Map<Double, Integer> getTotalOrderAtPrice(@RequestParam String side){

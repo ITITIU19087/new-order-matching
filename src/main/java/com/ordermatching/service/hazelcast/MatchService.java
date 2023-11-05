@@ -4,13 +4,10 @@ import com.hazelcast.map.IMap;
 import com.ordermatching.config.HazelcastConfig;
 import com.ordermatching.entity.Order;
 import lombok.extern.slf4j.Slf4j;
-import org.aspectj.weaver.ast.Or;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-
-import javax.persistence.ManyToOne;
 import java.util.*;
-import java.util.stream.Collectors;
+
 
 @Service
 @Slf4j
@@ -34,10 +31,11 @@ public class MatchService {
         IMap<String, Order> orderMap = hazelcastConfig.hazelcastInstance().getMap("orders");
         List<Order> orderListBySide = new ArrayList<>();
         for (Order order: orderMap.values()){
-            if(order.getSide().equals(side)){
+            if(order.getSide().equals(side) && !order.isMatched()){
                 orderListBySide.add(order);
             }
         }
+        orderListBySide.sort(Comparator.comparing(Order::getOrderTime));
         return orderListBySide;
     }
 
@@ -45,12 +43,10 @@ public class MatchService {
         List<Order> allOrderBySide = getAllOrdersBySide(side);
         Map<Double, List<Order>> ordersGroupedByPrice = new HashMap<>();
         for (Order order : allOrderBySide) {
-            if (!order.isMatched()) {
-                double price = order.getPrice();
-                List<Order> ordersWithSamePrice = ordersGroupedByPrice.getOrDefault(price, new ArrayList<>());
-                ordersWithSamePrice.add(order);
-                ordersGroupedByPrice.put(price, ordersWithSamePrice);
-            }
+            double price = order.getPrice();
+            List<Order> ordersWithSamePrice = ordersGroupedByPrice.getOrDefault(price, new ArrayList<>());
+            ordersWithSamePrice.add(order);
+            ordersGroupedByPrice.put(price, ordersWithSamePrice);
         }
         return ordersGroupedByPrice;
     }
@@ -138,24 +134,6 @@ public class MatchService {
         return priceList;
     }
 
-    public void matchOrdersUsingFifo(){
-        double bestBuyPrice = getBestPriceOfSide("BUY");
-        double bestSellPrice = getBestPriceOfSide("SELL");
-
-        List<Order> buyOrders = getOrdersAtPrice("BUY", bestBuyPrice);
-        List<Order> sellOrders = getOrdersAtPrice("SELL", bestSellPrice);
-        xxMatch(buyOrders, sellOrders);
-
-        while (bestBuyPrice >= bestSellPrice && bestSellPrice != 0 && bestBuyPrice != 0) {
-            buyOrders = getOrdersAtPrice("BUY", bestBuyPrice);
-            sellOrders = getOrdersAtPrice("SELL", bestSellPrice);
-            xxMatch(buyOrders, sellOrders);
-
-            bestBuyPrice = getBestPriceOfSide("BUY");
-            bestSellPrice = getBestPriceOfSide("SELL");
-        }
-    }
-
     public Double getHighestQuantityAtPrice(String side, Double price){
         List<Order> orderList = getOrdersAtPrice(side, price);
         Collections.sort(orderList, Comparator.comparing(Order::getQuantity));
@@ -174,22 +152,58 @@ public class MatchService {
         return filterList.get(0);
     }
 
+    public Map<Double, Integer> getTotalOrderAtPrice(String side){
+        Map<Double, List<Order>> priceMap = groupOrderByPrice(side);
+        Map<Double, Integer> priceCountMap = new HashMap<>();
+
+        for (Double orderPrice : priceMap.keySet()) {
+            List<Order> orderList = priceMap.get(orderPrice);
+            int orderCount = orderList.size();
+            priceCountMap.put(orderPrice, orderCount);
+        }
+        return priceCountMap;
+    }
+
+    public void initialCheck(){
+        double bestBuyPrice = getBestPriceOfSide("BUY");
+        double bestSellPrice = getBestPriceOfSide("SELL");
+
+        List<Order> buyOrders = getOrdersAtPrice("BUY", bestBuyPrice);
+        List<Order> sellOrders = getOrdersAtPrice("SELL", bestSellPrice);
+        while (bestSellPrice < bestBuyPrice){
+            log.info("initCheck");
+            xxMatch(buyOrders, sellOrders);
+            buyOrders = getOrdersAtPrice("BUY", getBestPriceOfSide("BUY"));
+            sellOrders = getOrdersAtPrice("SELL", getBestPriceOfSide("SELL"));
+
+            bestBuyPrice = getBestPriceOfSide("BUY");
+            bestSellPrice = getBestPriceOfSide("SELL");
+        }
+    }
+
+    public void matchOrdersUsingFifo(){
+        double bestBuyPrice = getBestPriceOfSide("BUY");
+        double bestSellPrice = getBestPriceOfSide("SELL");
+
+        List<Order> buyOrders = getOrdersAtPrice("BUY", bestBuyPrice);
+        List<Order> sellOrders = getOrdersAtPrice("SELL", bestSellPrice);
+        xxMatch(buyOrders, sellOrders);
+    }
     public void proRataBuy(){
         Double bestBuyPrice = getBestPriceOfSide("BUY");
         Double bestSellPrice = getBestPriceOfSide("SELL");
         Double highestBuyQuantity = getHighestQuantityAtPrice("BUY", bestBuyPrice);
 
-        if (highestBuyQuantity >= PRO_RATA_MIN || bestBuyPrice == bestSellPrice){
+        if (highestBuyQuantity >= PRO_RATA_MIN && bestBuyPrice.equals(bestSellPrice)){
             Order buyOrder = getOrderByQuantity(highestBuyQuantity, "BUY", bestBuyPrice);
-
             while (buyOrder.getQuantity() > 0){
                 List<Order> sellOrders = getOrdersAtPrice("SELL", bestSellPrice);
                 sellOrders.sort(Comparator.comparing(Order::getQuantity).reversed());
                 double totalSellQuantity = sellOrders.stream().mapToDouble(Order::getQuantity).sum();
                 double totalBuyQuantity = buyOrder.getQuantity();
                 for(Order order : sellOrders){
-                    double ratio = order.getQuantity() / totalBuyQuantity;
-                    double proratedVolume = ratio * totalSellQuantity;
+                    double ratio = order.getQuantity() / totalSellQuantity;
+                    double proratedVolume = ratio * totalBuyQuantity;
                     log.info("prorated: " + proratedVolume);
                     int matchQuantity = 0;
 
@@ -197,12 +211,14 @@ public class MatchService {
                         matchQuantity = (int) Math.floor(proratedVolume);
                     }
                     order.setQuantity(order.getQuantity() - matchQuantity);
-                    log.info( "BUY order: " +order.getQuantity());
+                    log.info( "SELL order: " + order.getQuantity());
                     log.info("matchedQuantity: " + matchQuantity);
+                    log.info( "BUY order: " +order.getQuantity());
                     buyOrder.setQuantity(buyOrder.getQuantity() - matchQuantity);
                     updateOrder(order);
                     updateOrder(buyOrder);
                 }
+
                 if (buyOrder.getQuantity() <= PRO_RATA_MIN_ALLOCATION){
                     break;
                 }
@@ -215,9 +231,8 @@ public class MatchService {
         Double bestSellPrice = getBestPriceOfSide("SELL");
         Double highestSellQuantity = getHighestQuantityAtPrice("SELL", bestSellPrice);
 
-        if (highestSellQuantity >= PRO_RATA_MIN || bestBuyPrice == bestSellPrice){
+        if (highestSellQuantity >= PRO_RATA_MIN && bestBuyPrice.equals(bestSellPrice)){
             Order sellOrder = getOrderByQuantity(highestSellQuantity, "SELL", bestSellPrice);
-
             while (sellOrder.getQuantity() > 0){
                 List<Order> buyOrders = getOrdersAtPrice("BUY", bestBuyPrice);
                 buyOrders.sort(Comparator.comparing(Order::getQuantity).reversed());
@@ -233,7 +248,7 @@ public class MatchService {
                         matchQuantity = (int) Math.floor(proratedVolume);
                     }
                     order.setQuantity(order.getQuantity() - matchQuantity);
-                    log.info( "BUY order: " +order.getQuantity());
+                    log.info( "BUY order: " + order.getQuantity());
                     log.info("matchedQuantity: " + matchQuantity);
                     sellOrder.setQuantity(sellOrder.getQuantity() - matchQuantity);
                     updateOrder(order);
@@ -275,17 +290,5 @@ public class MatchService {
                 sellOrders.remove(sellOrder);
             }
         }
-    }
-
-    public Map<Double, Integer> getTotalOrderAtPrice(String side){
-        Map<Double, List<Order>> priceMap = groupOrderByPrice(side);
-        Map<Double, Integer> priceCountMap = new HashMap<>();
-
-        for (Double orderPrice : priceMap.keySet()) {
-            List<Order> orderList = priceMap.get(orderPrice);
-            int orderCount = orderList.size();
-            priceCountMap.put(orderPrice, orderCount);
-        }
-        return priceCountMap;
     }
 }

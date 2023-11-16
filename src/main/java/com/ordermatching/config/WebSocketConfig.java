@@ -7,12 +7,16 @@ import org.springframework.context.annotation.Bean;
 
 @org.springframework.context.annotation.Configuration
 public class WebSocketConfig {
-    @Bean
+    @Bean(destroyMethod = "stop")
     public SocketIOServer socketIOServer(){
         Configuration config = new Configuration();
         config.setHostname("localhost");
         config.setPort(9999);
 
-        return new SocketIOServer(config);
+        SocketIOServer server =  new SocketIOServer(config);
+
+        server.start();
+
+        return server;
     }
 }

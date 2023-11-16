@@ -4,6 +4,7 @@ import com.ordermatching.dto.OrderDto;
 import com.ordermatching.entity.Order;
 import com.ordermatching.service.hazelcast.OrderService;
 import com.ordermatching.service.hazelcast.MatchService;
+import com.ordermatching.service.hazelcast.TradeService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -19,6 +20,9 @@ public class OrderController {
 
     @Autowired
     private OrderService orderService;
+
+    @Autowired
+    private TradeService tradeService;
 
     @PostMapping("/create")
     public void createOrder(@RequestBody List<OrderDto> orderDtoList){
@@ -42,7 +46,7 @@ public class OrderController {
 
     @GetMapping("group-order")
     public List<Order> getAllOrderAtPrice(@RequestParam String side){
-        return matchService.getOrdersAtPrice(side, matchService.getBestPriceOfSide(side));
+        return matchService.getAllOrdersBySide(side);
     }
 
     @GetMapping("get-price")
@@ -54,5 +58,10 @@ public class OrderController {
     @GetMapping("total")
     public Map<Double, Integer> getTotalOrderAtPrice(@RequestParam String side){
         return matchService.getTotalOrderAtPrice(side);
+    }
+
+    @GetMapping("trade")
+    public Double getTradePrice(){
+        return tradeService.getTradePrice();
     }
 }

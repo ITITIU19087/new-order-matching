@@ -19,6 +19,7 @@ public class Trade {
     private String sellOrderUUID;
     private double quantity;
     private double price;
+    private boolean isUpdated = false;
 
     @OneToMany(mappedBy = "trade")
     private List<Order> orders;

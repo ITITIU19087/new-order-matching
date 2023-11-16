@@ -59,9 +59,4 @@ public class OrderController {
     public Map<Double, Integer> getTotalOrderAtPrice(@RequestParam String side){
         return matchService.getTotalOrderAtPrice(side);
     }
-
-    @GetMapping("trade")
-    public Double getTradePrice(){
-        return tradeService.getTradePrice();
-    }
 }

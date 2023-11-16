@@ -24,7 +24,13 @@ public class MatchService {
 
     public List<Order> getAllOrders(){
         IMap<String, Order> orderMap = hazelcastConfig.hazelcastInstance().getMap("orders");
-        return new ArrayList<>(orderMap.values());
+        List<Order> orderList = new ArrayList<>();
+        for (Order order : orderMap.values()){
+            if (!order.isMatched()){
+                orderList.add(order);
+            }
+        }
+        return orderList;
     }
 
     public List<Order> getAllOrdersBySide(String side){
@@ -166,12 +172,16 @@ public class MatchService {
 
     public void initialCheck(){
         double bestBuyPrice = getBestPriceOfSide("BUY");
+        log.info("BEST BUY PRICE: "+ bestBuyPrice);
         double bestSellPrice = getBestPriceOfSide("SELL");
+        log.info("BEST SELL PRICE: "+ bestSellPrice);
 
         List<Order> buyOrders = getOrdersAtPrice("BUY", bestBuyPrice);
         List<Order> sellOrders = getOrdersAtPrice("SELL", bestSellPrice);
         while (bestSellPrice < bestBuyPrice){
             log.info("initCheck");
+            log.info("BEST BUY PRICE: "+ bestBuyPrice);
+            log.info("BEST SELL PRICE: "+ bestSellPrice);
             xxMatch(buyOrders, sellOrders);
             buyOrders = getOrdersAtPrice("BUY", getBestPriceOfSide("BUY"));
             sellOrders = getOrdersAtPrice("SELL", getBestPriceOfSide("SELL"));
@@ -280,7 +290,7 @@ public class MatchService {
                 executeTrade(buyOrder, sellOrder);
             }
             else {
-                specialExecuteTrade(buyOrder, sellOrder);
+                executeTrade(buyOrder, sellOrder);
             }
 
             if(buyOrder.isMatched()){

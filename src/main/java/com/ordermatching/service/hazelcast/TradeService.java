@@ -4,12 +4,15 @@ import com.hazelcast.map.IMap;
 import com.ordermatching.config.HazelcastConfig;
 import com.ordermatching.entity.Order;
 import com.ordermatching.entity.Trade;
+import com.ordermatching.entity.TradePrice;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.sql.Time;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 public class TradeService {
@@ -32,24 +35,26 @@ public class TradeService {
         tradeMap.put(trade.getUUID(), trade);
     }
 
-    public List<Trade> getUnUpdatedTrade(){
+    public List<Trade> getCandlePrice(){
+        LocalDateTime time = LocalDateTime.now().minusMinutes(2);
         IMap<String, Trade> tradeMap = hazelcastConfig.hazelcastInstance().getMap("trades");
-        List<Trade> unUpdatedTrade = new ArrayList<>();
-        for (Trade trade : tradeMap.values()) {
-            if(!trade.isUpdated()){
-                unUpdatedTrade.add(trade);
-            }
-        }
-        unUpdatedTrade.sort(Comparator.comparing(Trade::getTradeTime));
-        return unUpdatedTrade;
+        List<Trade> tradeList = new ArrayList<>(tradeMap.values())
+                .stream()
+                .filter(trade -> trade.getTradeTime().isAfter(time))
+                .collect(Collectors.toList());
+        return tradeList;
+
     }
 
-    public Map<LocalDateTime, Double> getTradePrice(){
-        List<Trade> unUpdatedTrade = getUnUpdatedTrade();
-        Map<LocalDateTime, Double> tradePrice = new HashMap<>();
-        for (Trade trade: unUpdatedTrade){
-            tradePrice.put(trade.getTradeTime(), trade.getPrice());
-        }
-        return tradePrice;
+    public TradePrice getCandleStickPrice(){
+        List<Trade> tradeList = getCandlePrice();
+
+        Double maxPrice = Collections.max(tradeList, Comparator.comparing(Trade::getPrice)).getPrice();
+        Double minPrice = Collections.min(tradeList, Comparator.comparing(Trade::getPrice)).getPrice();
+        Double openPrice = Collections.min(tradeList, Comparator.comparing(Trade::getTradeTime)).getPrice();
+        Double closePrice = Collections.max(tradeList, Comparator.comparing(Trade::getTradeTime)).getPrice();
+
+        return new TradePrice(openPrice, closePrice, maxPrice, minPrice);
     }
+
 }

@@ -2,6 +2,8 @@ package com.ordermatching.controller;
 
 import com.ordermatching.dto.OrderDto;
 import com.ordermatching.entity.Order;
+import com.ordermatching.entity.Trade;
+import com.ordermatching.entity.TradePrice;
 import com.ordermatching.service.hazelcast.OrderService;
 import com.ordermatching.service.hazelcast.MatchService;
 import com.ordermatching.service.hazelcast.TradeService;
@@ -58,5 +60,15 @@ public class OrderController {
     @GetMapping("total")
     public Map<Double, Integer> getTotalOrderAtPrice(@RequestParam String side){
         return matchService.getTotalOrderAtPrice(side);
+    }
+
+    @GetMapping("trade-price")
+    public List<Trade> getTrade(){
+        return tradeService.getCandlePrice();
+    }
+
+    @GetMapping("candle-price")
+    public TradePrice getTradePrice(){
+        return tradeService.getCandleStickPrice();
     }
 }

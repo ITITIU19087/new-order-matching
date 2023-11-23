@@ -7,7 +7,9 @@ import com.ordermatching.entity.Trade;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.util.UUID;
+import java.sql.Time;
+import java.time.LocalDateTime;
+import java.util.*;
 
 @Service
 public class TradeService {
@@ -15,7 +17,7 @@ public class TradeService {
     private HazelcastConfig hazelcastConfig;
 
     public void createTrade(Order buyOrder, Order sellOrder, double matchedQuantity){
-        IMap<String, Trade> orderMap = hazelcastConfig.hazelcastInstance().getMap("trades");
+        IMap<String, Trade> tradeMap = hazelcastConfig.hazelcastInstance().getMap("trades");
         Trade trade = new Trade();
         String tradeUUID = UUID.randomUUID().toString();
 
@@ -25,6 +27,29 @@ public class TradeService {
         trade.setQuantity(matchedQuantity);
         trade.setPrice(buyOrder.getPrice());
 
-        orderMap.put(trade.getUUID(), trade);
+        trade.setTradeTime(LocalDateTime.now());
+
+        tradeMap.put(trade.getUUID(), trade);
+    }
+
+    public List<Trade> getUnUpdatedTrade(){
+        IMap<String, Trade> tradeMap = hazelcastConfig.hazelcastInstance().getMap("trades");
+        List<Trade> unUpdatedTrade = new ArrayList<>();
+        for (Trade trade : tradeMap.values()) {
+            if(!trade.isUpdated()){
+                unUpdatedTrade.add(trade);
+            }
+        }
+        unUpdatedTrade.sort(Comparator.comparing(Trade::getTradeTime));
+        return unUpdatedTrade;
+    }
+
+    public Map<LocalDateTime, Double> getTradePrice(){
+        List<Trade> unUpdatedTrade = getUnUpdatedTrade();
+        Map<LocalDateTime, Double> tradePrice = new HashMap<>();
+        for (Trade trade: unUpdatedTrade){
+            tradePrice.put(trade.getTradeTime(), trade.getPrice());
+        }
+        return tradePrice;
     }
 }

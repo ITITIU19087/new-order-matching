@@ -1,23 +1,21 @@
 package com.ordermatching.entity;
 
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
-import javax.persistence.Entity;
-import javax.persistence.GeneratedValue;
-import javax.persistence.GenerationType;
-import javax.persistence.Id;
-
-@Entity
 @Data
+@NoArgsConstructor
 public class TradePrice {
+    public TradePrice(Double openPrice, Double closePrice, Double maxPrice, Double minPrice) {
+        this.openPrice = openPrice;
+        this.closePrice = closePrice;
+        this.maxPrice = maxPrice;
+        this.minPrice = minPrice;
+    }
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.AUTO)
-    private Long id;
-
-    private Long openPrice;
-    private Long closePrice;
-    private Long maxPrice;
-    private Long minPrice;
+    private Double openPrice;
+    private Double closePrice;
+    private Double maxPrice;
+    private Double minPrice;
 
 }

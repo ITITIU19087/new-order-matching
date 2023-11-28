@@ -34,7 +34,6 @@ public class TradeService {
     }
 
     public List<Trade> getCandlePrice(LocalDateTime time){
-//        LocalDateTime time = LocalDateTime.now().minusMinutes(60);
         IMap<String, Trade> tradeMap = hazelcastConfig.hazelcastInstance().getMap("trades");
         List<Trade> tradeList = new ArrayList<>(tradeMap.values())
                 .stream()
@@ -45,7 +44,7 @@ public class TradeService {
     }
 
     public TradePrice getCandleStickPrice(){
-        LocalDateTime time = LocalDateTime.now().minusMinutes(60);
+        LocalDateTime time = LocalDateTime.now().minusMinutes(2);
         List<Trade> tradeList = getCandlePrice(time);
         Double    maxPrice = Collections.max(tradeList, Comparator.comparing(Trade::getPrice)).getPrice();
         Double    minPrice = Collections.min(tradeList, Comparator.comparing(Trade::getPrice)).getPrice();

@@ -35,8 +35,8 @@ public class TradeService {
         tradeMap.put(trade.getUUID(), trade);
     }
 
-    public List<Trade> getCandlePrice(){
-        LocalDateTime time = LocalDateTime.now().minusMinutes(2);
+    public List<Trade> getCandlePrice(LocalDateTime time){
+//        LocalDateTime time = LocalDateTime.now().minusMinutes(60);
         IMap<String, Trade> tradeMap = hazelcastConfig.hazelcastInstance().getMap("trades");
         List<Trade> tradeList = new ArrayList<>(tradeMap.values())
                 .stream()
@@ -47,14 +47,15 @@ public class TradeService {
     }
 
     public TradePrice getCandleStickPrice(){
-        List<Trade> tradeList = getCandlePrice();
+        LocalDateTime time = LocalDateTime.now().minusMinutes(60);
+        List<Trade> tradeList = getCandlePrice(time);
+        Double    maxPrice = Collections.max(tradeList, Comparator.comparing(Trade::getPrice)).getPrice();
+        Double    minPrice = Collections.min(tradeList, Comparator.comparing(Trade::getPrice)).getPrice();
+        Double    openPrice = Collections.min(tradeList, Comparator.comparing(Trade::getTradeTime)).getPrice();
+        Double    closePrice = Collections.max(tradeList, Comparator.comparing(Trade::getTradeTime)).getPrice();
 
-        Double maxPrice = Collections.max(tradeList, Comparator.comparing(Trade::getPrice)).getPrice();
-        Double minPrice = Collections.min(tradeList, Comparator.comparing(Trade::getPrice)).getPrice();
-        Double openPrice = Collections.min(tradeList, Comparator.comparing(Trade::getTradeTime)).getPrice();
-        Double closePrice = Collections.max(tradeList, Comparator.comparing(Trade::getTradeTime)).getPrice();
+        return new TradePrice(String.valueOf(time), openPrice, closePrice, maxPrice, minPrice);
 
-        return new TradePrice(openPrice, closePrice, maxPrice, minPrice);
     }
 
 }

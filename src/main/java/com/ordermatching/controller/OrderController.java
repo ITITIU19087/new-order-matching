@@ -63,12 +63,7 @@ public class OrderController {
     }
 
     @GetMapping("trade-price")
-    public List<Trade> getTrade(){
-        return tradeService.getCandlePrice();
-    }
-
-    @GetMapping("candle-price")
-    public TradePrice getTradePrice(){
+    public TradePrice getTrade(){
         return tradeService.getCandleStickPrice();
     }
 }

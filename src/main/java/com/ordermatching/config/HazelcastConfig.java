@@ -17,16 +17,15 @@ public class HazelcastConfig {
         Config config = new Config();
         config.setInstanceName("orders");
         JoinConfig joinConfig = config.getNetworkConfig().getJoin();
-        joinConfig.getMulticastConfig().setEnabled(true);
-        config.getJetConfig().setEnabled(true);
+        joinConfig.getMulticastConfig().setEnabled(true).setMulticastPort(5701);
         config.setClusterName("order-matching");
+        config.getJetConfig().setEnabled(true).setResourceUploadEnabled(true);
         return config;
     }
 
     @Bean
     public JetInstance jetInstance(){
-        JetConfig config = hazelcastConfig().getJetConfig();
-        return Jet.newJetInstance(config);
+        return Jet.newJetInstance(hazelcastConfig().getJetConfig());
     }
 
     @Bean

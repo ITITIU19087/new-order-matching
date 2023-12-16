@@ -75,4 +75,36 @@ public class JetMatchService {
             return Collections.min(priceMap.keySet());
         }
     }
+
+    public List<Order> getOrdersAtPrice(String side, Double price){
+        Pipeline pipeline = Pipeline.create();
+
+        pipeline
+                .readFrom(Sources.<String, Order>map("orders"))
+                .filter(entry -> entry.getValue().getSide().equals(side))
+                .filter(entry -> entry.getValue().getPrice().equals(price))
+                .map(Map.Entry::getValue)
+                .sort(ComparatorEx.comparing(Order::getOrderTime))
+                .writeTo(Sinks.list("orderListAtPrice"));
+
+        try{
+            jetInstance.newJob(pipeline).join();
+            return new ArrayList<>(jetInstance.getList("orderListAtPrice"));
+        }
+        finally {
+            jetInstance.getList("orderListAtPrice").destroy();
+        }
+    }
+
+    public void updateOrder(Order order){
+        IMap<String, Order> orderMap = jetInstance.getMap("orders");
+        Order oldOrder = orderMap.get(order.getUUID());
+        if (oldOrder != null){
+            oldOrder.setQuantity(order.getQuantity());
+            if (order.getQuantity() == 0) {
+                oldOrder.setMatched(order.isMatched());
+            }
+            orderMap.put(order.getUUID(), oldOrder);
+        }
+    }
 }

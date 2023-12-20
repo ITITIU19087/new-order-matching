@@ -51,6 +51,19 @@
             <artifactId>hazelcast-jet</artifactId>
             <version>4.5.4</version>
         </dependency>
+        <!-- https://mvnrepository.com/artifact/com.hazelcast.jet/hazelcast-jet-cdc-debezium -->
+        <dependency>
+            <groupId>com.hazelcast.jet</groupId>
+            <artifactId>hazelcast-jet-cdc-debezium</artifactId>
+            <version>4.5.4</version>
+            <scope>provided</scope>
+        </dependency>
+        <!-- https://mvnrepository.com/artifact/com.hazelcast.jet/hazelcast-jet-cdc-postgres -->
+        <dependency>
+            <groupId>com.hazelcast.jet</groupId>
+            <artifactId>hazelcast-jet-cdc-postgres</artifactId>
+            <version>4.5.4</version>
+        </dependency>
         <dependency>
             <groupId>com.corundumstudio.socketio</groupId>
             <artifactId>netty-socketio</artifactId>

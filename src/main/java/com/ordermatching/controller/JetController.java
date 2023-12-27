@@ -4,9 +4,7 @@ import com.ordermatching.dto.OrderDto;
 import com.ordermatching.entity.Order;
 import com.ordermatching.service.hazelcast.jet.JetMatchService;
 import com.ordermatching.service.hazelcast.jet.JetOrderService;
-import org.aspectj.weaver.ast.Or;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -28,15 +26,15 @@ public class JetController {
         return jetMatchService.getAllOrders();
     }
 
+    @GetMapping("/alll")
+    private List<Order> getAllOrders(@RequestParam String side){
+        return jetMatchService.getOrdersBySide(side);
+    }
+
     @PostMapping("/create")
     public ResponseEntity<String> createOrders(@RequestBody List<OrderDto> orderDtoList){
         jetOrderService.createOrders(orderDtoList);
         return ResponseEntity.ok("Success");
-    }
-
-    @PostMapping("/get-by-side")
-    public List<Order> getOrderBySide(@RequestParam String side){
-        return jetMatchService.getAllOrderBySide(side);
     }
 
     @PostMapping("/group")

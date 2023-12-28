@@ -1,18 +1,14 @@
 package com.ordermatching.service.hazelcast.jet;
 
-import com.hazelcast.collection.IList;
 import com.hazelcast.jet.JetInstance;
 import com.hazelcast.map.IMap;
-import com.ordermatching.config.HazelcastConfig;
 import com.ordermatching.dto.OrderDto;
 import com.ordermatching.entity.Order;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -30,7 +26,7 @@ public class JetOrderService {
             Order order = convertOrder(orderDto);
             orderMap.put(order.getUUID(), order);
         }
-//        matchService.initialCheck();
+        matchService.initialCheck();
         matchService.proRataSell();
         matchService.matchOrdersUsingFifo();
     }

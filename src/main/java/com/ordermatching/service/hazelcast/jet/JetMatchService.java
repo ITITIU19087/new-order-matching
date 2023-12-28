@@ -50,7 +50,7 @@ public class JetMatchService {
         }
     }
 
-    public Map<Double, List<Order>> groupOrderByPrice(String side) {
+    public void groupOrderByPrice(String side) {
         Pipeline pipeline = Pipeline.create();
         pipeline
                 .readFrom(Sources.<String, Order>map("orders1"))
@@ -59,23 +59,34 @@ public class JetMatchService {
                 .groupingKey(entry -> entry.getValue().getPrice())
                 .aggregate(AggregateOperations.toList())
                 .writeTo(Sinks.map("groupedOrdersByPrice"));
-        try {
-            jetInstance.newJob(pipeline).join();
-            return new HashMap<>(jetInstance.getMap("groupedOrdersByPrice"));
-        } finally {
-            jetInstance.getMap("groupedOrdersByPrice").destroy();
-        }
+        jetInstance.newJob(pipeline).join();
     }
 
-    public Double getBestPriceOfSide(String side) {
-        Map<Double, List<Order>> priceMap = groupOrderByPrice(side);
-        if (priceMap.isEmpty()) {
-            return 0.0;
+    public List<Double> getBestPrice(String side){
+        groupOrderByPrice(side);
+        Pipeline pipeline = Pipeline.create();
+
+        if(side.equals("BUY")){
+            pipeline
+                    .readFrom(Sources.<Double, List<Order>>map("groupedOrdersByPrice"))
+                    .aggregate(AggregateOperations.maxBy(ComparatorEx.comparingDouble(Map.Entry::getKey)))
+                    .map(Map.Entry::getKey)
+                    .writeTo(Sinks.list("bestPriceMap"));
         }
-        if (side.equals("BUY")) {
-            return Collections.max(priceMap.keySet());
-        } else {
-            return Collections.min(priceMap.keySet());
+        else {
+            pipeline
+                    .readFrom(Sources.<Double, List<Order>>map("groupedOrdersByPrice"))
+                    .aggregate(AggregateOperations.minBy(ComparatorEx.comparingDouble(Map.Entry::getKey)))
+                    .map(Map.Entry::getKey)
+                    .writeTo(Sinks.list("bestPriceMap"));
+        }
+
+        try {
+            jetInstance.newJob(pipeline).join();
+            return new ArrayList<>(jetInstance.getList("bestPriceMap"));
+        } finally {
+            jetInstance.getList("bestPriceMap").destroy();
+            jetInstance.getMap("groupedOrdersByPrice").destroy();
         }
     }
 
@@ -164,15 +175,15 @@ public class JetMatchService {
     }
 
     public void matchOrdersUsingFifo() {
-        List<Order> buyOrders = getOrdersAtPrice("BUY", getBestPriceOfSide("BUY"));
-        List<Order> sellOrders = getOrdersAtPrice("SELL", getBestPriceOfSide("SELL"));
+        List<Order> buyOrders = getOrdersAtPrice("BUY", getBestPrice("BUY").get(0));
+        List<Order> sellOrders = getOrdersAtPrice("SELL", getBestPrice("SELL").get(0));
 
         matchOrders(buyOrders, sellOrders);
     }
 
     public void initialCheck() {
-        double bestBuyPrice = getBestPriceOfSide("BUY");
-        double bestSellPrice = getBestPriceOfSide("SELL");
+        double bestBuyPrice = getBestPrice("BUY").get(0);
+        double bestSellPrice = getBestPrice("SELL").get(0);
 
         while (bestSellPrice < bestBuyPrice) {
             List<Order> buyOrders = getOrdersAtPrice("BUY", bestBuyPrice);
@@ -180,8 +191,8 @@ public class JetMatchService {
 
             matchOrders(buyOrders, sellOrders);
 
-            bestBuyPrice = getBestPriceOfSide("BUY");
-            bestSellPrice = getBestPriceOfSide("SELL");
+            bestBuyPrice = getBestPrice("BUY").get(0);
+            bestSellPrice = getBestPrice("SELL").get(0);
         }
     }
 
@@ -216,8 +227,8 @@ public class JetMatchService {
         List<Order> orderProRataList = getProrataOrder("SELL");
 
         if (!orderProRataList.isEmpty()) {
-            Double bestBuyPrice = getBestPriceOfSide("BUY");
-            Double bestSellPrice = getBestPriceOfSide("SELL");
+            Double bestBuyPrice = getBestPrice("BUY").get(0);
+            Double bestSellPrice = getBestPrice("SELL").get(0);
             if (bestBuyPrice.equals(bestSellPrice)) {
                 List<Order> buyOrders = getOrdersAtPrice("BUY", bestBuyPrice);
                 Order sellOrder = orderProRataList.get(0);

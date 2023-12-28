@@ -9,8 +9,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.ListResourceBundle;
-import java.util.Map;
 
 @RestController
 @RequestMapping("jet")
@@ -37,18 +35,8 @@ public class JetController {
         return ResponseEntity.ok("Success");
     }
 
-    @PostMapping("/group")
-    public Map<Double, List<Order>> groupOrderByPrice(@RequestParam String side){
-        return jetMatchService.groupOrderByPrice(side);
-    }
-
     @GetMapping("/best")
-    public Double getBestPrice(@RequestParam String side){
-        return jetMatchService.getBestPriceOfSide(side);
-    }
-
-    @GetMapping("/price")
-    public List<Order> getOrderAtPrice(@RequestParam String side, @RequestParam Double price){
-        return jetMatchService.getOrdersAtPrice(side, price);
+    public List<Double> getBestPrice(@RequestParam String side){
+        return jetMatchService.getBestPrice(side);
     }
 }

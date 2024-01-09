@@ -50,7 +50,7 @@ public class JetMatchService {
         }
     }
 
-    public void groupOrderByPrice(String side) {
+    public Map<Double, List<Order>> groupOrderByPrice(String side) {
         Pipeline pipeline = Pipeline.create();
         pipeline
                 .readFrom(Sources.<String, Order>map("orders1"))
@@ -59,34 +59,67 @@ public class JetMatchService {
                 .groupingKey(entry -> entry.getValue().getPrice())
                 .aggregate(AggregateOperations.toList())
                 .writeTo(Sinks.map("groupedOrdersByPrice"));
-        jetInstance.newJob(pipeline).join();
+        try{
+            jetInstance.newJob(pipeline).join();
+            return new HashMap<>(jetInstance.getMap("groupedOrdersByPrice"));
+        }
+        finally {
+            jetInstance.getMap("groupedOrdersByPrice").destroy();
+        }
     }
 
-    public List<Double> getBestPrice(String side){
-        groupOrderByPrice(side);
+    public Double getBestPrice(String side){
         Pipeline pipeline = Pipeline.create();
+        pipeline
+                .readFrom(Sources.<String, Order>map("orders1"))
+                .filter(entry -> entry.getValue().getSide().equals(side))
+                .filter(entry -> !entry.getValue().isMatched())
+                .groupingKey(entry -> entry.getValue().getPrice())
+                .aggregate(AggregateOperations.toList())
+                .writeTo(Sinks.map("groupOrdersByPrice"));
+        jetInstance.newJob(pipeline).join();
 
+        Pipeline pipeline1 = Pipeline.create();
         if(side.equals("BUY")){
-            pipeline
-                    .readFrom(Sources.<Double, List<Order>>map("groupedOrdersByPrice"))
+            pipeline1
+                    .readFrom(Sources.<Double, List<Order>>map("groupOrdersByPrice"))
                     .aggregate(AggregateOperations.maxBy(ComparatorEx.comparingDouble(Map.Entry::getKey)))
                     .map(Map.Entry::getKey)
                     .writeTo(Sinks.list("bestPriceMap"));
         }
         else {
-            pipeline
-                    .readFrom(Sources.<Double, List<Order>>map("groupedOrdersByPrice"))
-                    .aggregate(AggregateOperations.minBy(ComparatorEx.comparingDouble(Map.Entry::getKey)))
+            pipeline1
+                    .readFrom(Sources.<Double, List<Order>>map("groupOrdersByPrice"))
+                    .aggregate(AggregateOperations.minBy(ComparatorEx.comparingDouble(entry -> entry.getKey())))
                     .map(Map.Entry::getKey)
                     .writeTo(Sinks.list("bestPriceMap"));
         }
-
-        try {
-            jetInstance.newJob(pipeline).join();
-            return new ArrayList<>(jetInstance.getList("bestPriceMap"));
-        } finally {
+        try{
+            jetInstance.newJob(pipeline1).join();
+            List<Double> list = jetInstance.getList("bestPriceMap");
+            if (!list.isEmpty()) {
+                return list.get(0);
+            } else {
+                System.out.println("NULLLLLLLL");
+                return 0.0;
+            }
+        }
+        finally {
+            jetInstance.getMap("groupOrdersByPrice").destroy();
             jetInstance.getList("bestPriceMap").destroy();
-            jetInstance.getMap("groupedOrdersByPrice").destroy();
+        }
+    }
+
+    public Double getBestPrice1(String side){
+        Map<Double, List<Order>> map = groupOrderByPrice(side);
+        if (map.isEmpty()){
+            return 0.0;
+        }
+        if (side.equals("BUY")){
+            return Collections.max(map.keySet());
+        }
+        else{
+            return Collections.min(map.keySet());
         }
     }
 
@@ -175,49 +208,49 @@ public class JetMatchService {
     }
 
     public void matchOrdersUsingFifo() {
-        List<Order> buyOrders = getOrdersAtPrice("BUY", getBestPrice("BUY").get(0));
-        List<Order> sellOrders = getOrdersAtPrice("SELL", getBestPrice("SELL").get(0));
+        List<Order> buyOrders = getOrdersAtPrice("BUY", getBestPrice("BUY"));
+        List<Order> sellOrders = getOrdersAtPrice("SELL", getBestPrice("SELL"));
 
         matchOrders(buyOrders, sellOrders);
     }
 
     public void initialCheck() {
-        double bestBuyPrice = getBestPrice("BUY").get(0);
-        double bestSellPrice = getBestPrice("SELL").get(0);
+        double bestBuyPrice = getBestPrice("BUY");
+        double bestSellPrice = getBestPrice("SELL");
 
-        while (bestSellPrice < bestBuyPrice) {
+        while (bestSellPrice <= bestBuyPrice) {
             List<Order> buyOrders = getOrdersAtPrice("BUY", bestBuyPrice);
             List<Order> sellOrders = getOrdersAtPrice("SELL", bestSellPrice);
 
             matchOrders(buyOrders, sellOrders);
 
-            bestBuyPrice = getBestPrice("BUY").get(0);
-            bestSellPrice = getBestPrice("SELL").get(0);
+            bestBuyPrice = getBestPrice("BUY");
+            bestSellPrice = getBestPrice("SELL");
         }
     }
 
-    // TODO: should check initCheck() with PriorityQueue
-
     public List<Order> getProrataOrder(String side) {
         Pipeline pipeline = Pipeline.create();
-        try {
+        try{
             if (side.equals("BUY")) {
                 pipeline
                         .readFrom(Sources.<String, Order>map("orders_prorata_buy"))
                         .filter(entry -> !entry.getValue().isMatched())
                         .map(Map.Entry::getValue)
-                        .writeTo(Sinks.list("list"));
+                        .writeTo(Sinks.list("prorata_buy_list"));
                 jetInstance.newJob(pipeline).join();
                 return new ArrayList<>(jetInstance.getList("prorata_buy_list"));
-            } else
+            } else {
                 pipeline
                         .readFrom(Sources.<String, Order>map("orders_prorata_sell"))
                         .filter(entry -> !entry.getValue().isMatched())
                         .map(Map.Entry::getValue)
-                        .writeTo(Sinks.list("list"));
-            jetInstance.newJob(pipeline).join();
-            return new ArrayList<>(jetInstance.getList("prorata_sell_list"));
-        } finally {
+                        .writeTo(Sinks.list("prorata_sell_list"));
+                jetInstance.newJob(pipeline).join();
+                return new ArrayList<>(jetInstance.getList("prorata_sell_list"));
+            }
+        }
+         finally {
             jetInstance.getList("prorata_sell_list").destroy();
             jetInstance.getList("prorata_buy_list").destroy();
         }
@@ -227,8 +260,8 @@ public class JetMatchService {
         List<Order> orderProRataList = getProrataOrder("SELL");
 
         if (!orderProRataList.isEmpty()) {
-            Double bestBuyPrice = getBestPrice("BUY").get(0);
-            Double bestSellPrice = getBestPrice("SELL").get(0);
+            Double bestBuyPrice = getBestPrice("BUY");
+            Double bestSellPrice = getBestPrice("SELL");
             if (bestBuyPrice.equals(bestSellPrice)) {
                 List<Order> buyOrders = getOrdersAtPrice("BUY", bestBuyPrice);
                 Order sellOrder = orderProRataList.get(0);
@@ -248,12 +281,68 @@ public class JetMatchService {
                         sellOrder.setQuantity(orderProRataList.get(0).getQuantity() - matchQuantity);
                         updateOrder(order);
                         updateOrder(sellOrder);
+                        tradeService.createTrade(order, sellOrder, matchQuantity);
                     }
                     if (sellOrder.getQuantity() <= PRO_RATA_MIN_ALLOCATION) {
                         break;
                     }
                 }
             }
+        }
+    }
+    public void proRataBuy() {
+        List<Order> orderProRataList = getProrataOrder("BUY");
+
+        if (!orderProRataList.isEmpty()) {
+            Double bestBuyPrice = getBestPrice("BUY");
+            Double bestSellPrice = getBestPrice("SELL");
+            if (bestBuyPrice.equals(bestSellPrice)) {
+                List<Order> sellOrders = getOrdersAtPrice("SELL", bestSellPrice);
+                Order buyOrder = orderProRataList.get(0);
+                while (buyOrder.getQuantity() > 0) {
+                    sellOrders.sort(Comparator.comparing(Order::getQuantity).reversed());
+                    double totalBuyQuantity = sellOrders.stream().mapToDouble(Order::getQuantity).sum();
+                    double totalSellQuantity = buyOrder.getQuantity();
+                    for (Order order : sellOrders) {
+                        double ratio = order.getQuantity() / totalBuyQuantity;
+                        double proratedVolume = ratio * totalSellQuantity;
+                        int matchQuantity = 0;
+
+                        if (proratedVolume >= PRO_RATA_MIN_ALLOCATION) {
+                            matchQuantity = (int) Math.floor(proratedVolume);
+                        }
+                        order.setQuantity(order.getQuantity() - matchQuantity);
+                        buyOrder.setQuantity(orderProRataList.get(0).getQuantity() - matchQuantity);
+                        updateOrder(order);
+                        updateOrder(buyOrder);
+                        tradeService.createTrade(order, buyOrder, matchQuantity);
+                    }
+                    if (buyOrder.getQuantity() <= PRO_RATA_MIN_ALLOCATION) {
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    public Map<Double, Long> getTotalOrderAtPrice(String side) {
+        Pipeline pipeline = Pipeline.create();
+
+        pipeline
+                .readFrom(Sources.<String, Order>map("orders1"))
+                .filter(entry -> entry.getValue().getSide().equals(side))
+                .filter(entry -> !entry.getValue().isMatched())
+                .groupingKey(entry -> entry.getValue().getPrice())
+                .aggregate(AggregateOperations.counting())
+                .writeTo(Sinks.map("orderChartMap"));
+
+        try{
+            jetInstance.newJob(pipeline).join();
+            Map<Double, Long> returnMap = jetInstance.getMap("orderChartMap");
+            return returnMap;
+        }
+        finally {
+            jetInstance.getMap("orderChartMap").destroy();
         }
     }
 }

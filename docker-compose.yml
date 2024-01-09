@@ -9,3 +9,27 @@ services:
     environment:
       - MC_CLUSTER_NAME=order-matching-system
       - MC_CLUSTER_MEMBERS=hazelcast:5701
+
+  datadog:
+    image: datadog/agent:latest
+    environment:
+      - DD_API_KEY=a25bfd2d83892f42b495ef6134450adb
+      - DD_LOG_LEVEL=info
+      - DD_SITE=ap1.datadoghq.com
+      - DD_LOGS_ENABLED = true
+      - DD_APM_ENABLED=true
+      - DD_APM_NON_LOCAL_TRAFFIC=true
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /proc/:/host/proc/:ro
+      - /sys/fs/cgroup:/host/sys/fs/cgroup:ro
+    ports:
+      - "8082:8082"
+
+  hazelcast:
+    image: hazelcast/hazelcast:latest
+    ports:
+      - "5701:5701"
+    environment:
+      - JAVA_OPTS=-Dhazelcast.local.publicAddress=127.0.0.1:5701
+      - HZ_CLUSTERNAME=dev-client

@@ -4,6 +4,7 @@ import com.hazelcast.jet.JetInstance;
 import com.hazelcast.map.IMap;
 import com.ordermatching.dto.OrderDto;
 import com.ordermatching.entity.Order;
+import com.ordermatching.service.socketio.SocketIOService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -19,6 +20,8 @@ public class JetOrderService {
     @Autowired
     private JetMatchService matchService;
 
+    @Autowired
+    private SocketIOService service;
 
     public void createOrders(List<OrderDto> orderList){
         IMap<String, Order> orderMap = jetInstance.getMap("orders1");
@@ -28,7 +31,10 @@ public class JetOrderService {
         }
         matchService.initialCheck();
         matchService.proRataSell();
+        matchService.proRataBuy();
         matchService.matchOrdersUsingFifo();
+
+        service.notifyOrderCreation("orderCreated");
     }
     public Order convertOrder(OrderDto orderDto){
         IMap<String, Order> orderMap = jetInstance.getMap("orders_prorata_buy");

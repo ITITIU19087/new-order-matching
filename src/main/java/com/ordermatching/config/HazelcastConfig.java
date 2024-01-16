@@ -1,9 +1,7 @@
 package com.ordermatching.config;
 
-
 import com.hazelcast.client.config.ClientConfig;
 import com.hazelcast.config.Config;
-import com.hazelcast.config.JoinConfig;
 import com.hazelcast.core.Hazelcast;
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.jet.Jet;
@@ -17,18 +15,23 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 @EnableCaching
 public class HazelcastConfig {
-    public Config hazelcastConfig(){
+    public Config hazelcastConfig() {
         Config config = new Config();
         config.setInstanceName("orders");
-        JoinConfig joinConfig = config.getNetworkConfig().getJoin();
-        joinConfig.getMulticastConfig().setEnabled(true).setMulticastPort(5701);
         config.setClusterName("order-matching");
+
+        MapConfig mapConfig = new MapConfig("orders1");
+        mapConfig.setBackupCount(1);
+        mapConfig.setAsyncBackupCount(0);
+
+        config.addMapConfig(mapConfig);
         config.getJetConfig().setEnabled(true).setResourceUploadEnabled(true);
         return config;
     }
 
     @Bean
-    public JetInstance jetInstance(){
+    public JetInstance jetInstance() {
+        JetConfig jetConfig = new JetConfig();
         return Jet.newJetInstance(hazelcastConfig().getJetConfig());
     }
 
@@ -40,7 +43,7 @@ public class HazelcastConfig {
     }
 
     @Bean
-    public HazelcastInstance hazelcastInstance(){
+    public HazelcastInstance hazelcastInstance() {
         Config config = hazelcastConfig();
         return Hazelcast.newHazelcastInstance(config);
     }

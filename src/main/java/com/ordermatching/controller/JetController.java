@@ -3,19 +3,22 @@ package com.ordermatching.controller;
 import com.hazelcast.jet.JetInstance;
 import com.ordermatching.dto.OrderDto;
 import com.ordermatching.entity.Order;
+import com.ordermatching.entity.TradePrice;
+import com.ordermatching.service.hazelcast.TradeService;
 import com.ordermatching.service.hazelcast.jet.JetMatchService;
 import com.ordermatching.service.hazelcast.jet.JetOrderService;
+import com.ordermatching.service.hazelcast.jet.JetTradeService;
+import com.ordermatching.service.socketio.SocketIOService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 
 @RestController
 @RequestMapping("jet")
+@CrossOrigin(origins = "http://localhost:3000")
 public class JetController {
 
     @Autowired
@@ -26,6 +29,12 @@ public class JetController {
 
     @Autowired
     private JetOrderService jetOrderService;
+
+    @Autowired
+    private SocketIOService socketIOService;
+
+    @Autowired
+    private JetTradeService tradeService;
 
     @GetMapping("/all")
     private List<Order> getAllOrders(){
@@ -45,16 +54,44 @@ public class JetController {
 
     @GetMapping("/best")
     public Double getBestPrice(@RequestParam String side){
-        return jetMatchService.getBestPrice(side);
+        if (side.equals("BUY")){
+            return jetMatchService.getBestBuyPrice();
+        }
+        else{
+            return jetMatchService.getBestSellPrice();
+        }
+    }
+    @GetMapping("/best-jet")
+    public Double getBestPriceJet(@RequestParam String side){
+        if (side.equals("BUY")){
+            return jetMatchService.getBestBuyPriceJet();
+        }
+        else{
+            return jetMatchService.getBestSellPrice();
+        }
     }
 
     @GetMapping("map")
-    public Map<Double, List<Order>> mapCheck(){
-        return new HashMap<>(jetInstance.getMap("groupedOrdersByPrice"));
+    public Map<Double, List<Order>> mapCheck(@RequestParam String side){
+        return jetMatchService.groupOrderByPrice(side);
     }
 
     @GetMapping("total")
-    public Map<Double, Long> getTotalOrderAtPrice(@RequestParam String side){
+    public String getTotalOrderAtPrice(@RequestParam String side){
+        return jetMatchService.getTotalOrderAtPrice(side).toString();
+    }
+    @GetMapping("total-price")
+    public Map<Double, Long> getAllOrderAtPrice(@RequestParam String side){
         return jetMatchService.getTotalOrderAtPrice(side);
+    }
+
+    @GetMapping("socket")
+    public void socketDumps(){
+        socketIOService.dumps("Dumps msg");
+    }
+
+    @GetMapping("trade")
+    public TradePrice getTrades(){
+        return tradeService.getCandleStickPrice();
     }
 }

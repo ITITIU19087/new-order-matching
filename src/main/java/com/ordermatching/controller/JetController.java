@@ -3,6 +3,7 @@ package com.ordermatching.controller;
 import com.hazelcast.jet.JetInstance;
 import com.ordermatching.dto.OrderDto;
 import com.ordermatching.entity.Order;
+import com.ordermatching.entity.Trade;
 import com.ordermatching.entity.TradePrice;
 import com.ordermatching.service.hazelcast.TradeService;
 import com.ordermatching.service.hazelcast.jet.JetMatchService;
@@ -52,25 +53,6 @@ public class JetController {
         return ResponseEntity.ok("Success");
     }
 
-    @GetMapping("/best")
-    public Double getBestPrice(@RequestParam String side){
-        if (side.equals("BUY")){
-            return jetMatchService.getBestBuyPrice();
-        }
-        else{
-            return jetMatchService.getBestSellPrice();
-        }
-    }
-    @GetMapping("/best-jet")
-    public Double getBestPriceJet(@RequestParam String side){
-        if (side.equals("BUY")){
-            return jetMatchService.getBestBuyPriceJet();
-        }
-        else{
-            return jetMatchService.getBestSellPrice();
-        }
-    }
-
     @GetMapping("map")
     public Map<Double, List<Order>> mapCheck(@RequestParam String side){
         return jetMatchService.groupOrderByPrice(side);
@@ -93,5 +75,10 @@ public class JetController {
     @GetMapping("trade")
     public TradePrice getTrades(){
         return tradeService.getCandleStickPrice();
+    }
+
+    @GetMapping("trades")
+    public Map<String, Trade> getTrade(){
+        return jetInstance.getMap("trades");
     }
 }

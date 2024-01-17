@@ -1,10 +1,8 @@
 package com.ordermatching.service.hazelcast.jet;
 
 import com.hazelcast.collection.IList;
-import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.function.ComparatorEx;
 import com.hazelcast.jet.JetInstance;
-import com.hazelcast.jet.JetService;
 import com.hazelcast.jet.aggregate.AggregateOperations;
 import com.hazelcast.jet.pipeline.*;
 import com.hazelcast.map.IMap;
@@ -38,12 +36,22 @@ public class JetMatchService {
 
     public List<Order> getOrdersBySide(String side) {
         Pipeline pipeline = Pipeline.create();
-        pipeline
-                .readFrom(Sources.<String, Order>map("orders1"))
-                .filter(entry -> !entry.getValue().isMatched())
-                .filter(entry -> entry.getValue().getSide().equals(side))
-                .map(Map.Entry::getValue)
-                .writeTo(Sinks.list("list"));
+        if(side.equals("BUY")){
+            pipeline
+                    .readFrom(Sources.<String, Order>map("buy-orders"))
+                    .filter(entry -> !entry.getValue().isMatched())
+                    .filter(entry -> entry.getValue().getSide().equals(side))
+                    .map(Map.Entry::getValue)
+                    .writeTo(Sinks.list("list"));
+        }
+        else{
+            pipeline
+                    .readFrom(Sources.<String, Order>map("sell-orders"))
+                    .filter(entry -> !entry.getValue().isMatched())
+                    .filter(entry -> entry.getValue().getSide().equals(side))
+                    .map(Map.Entry::getValue)
+                    .writeTo(Sinks.list("list"));
+        }
         try {
             jetInstance.newJob(pipeline).join();
             return new ArrayList<>(jetInstance.getList("list"));
@@ -65,57 +73,42 @@ public class JetMatchService {
         return new HashMap<>(jetInstance.getMap("groupedOrdersByPrice"));
     }
 
-    public double getBestBuyPriceJet() {
-        groupOrderByPrice("BUY");
-
-        Pipeline pipeline1 = Pipeline.create();
-        pipeline1
-                .readFrom(Sources.<Double, List<Order>>map("groupedOrdersByPrice"))
-                .map(Map.Entry::getKey)
-                .writeTo(Sinks.list("bestBuyPrice"));
-
-        jetInstance.newJob(pipeline1).join();
-
-        Pipeline pipeline = Pipeline.create();
-        pipeline
-                .readFrom(Sources.<Double>list("bestBuyPrice"))
-                .aggregate(AggregateOperations.maxBy(Double::compareTo))
-                .writeTo(Sinks.list("filtered_list"));
-        try {
-            jetInstance.newJob(pipeline).join();
-            List<Double> list = jetInstance.getList("filtered_list");
-            return list.get(list.size()-1);
-        } finally {
-            jetInstance.getMap("groupedOrdersByPrice").destroy();
-            jetInstance.getList("bestBuyPrice").destroy();
-        }
-    }
-
     public List<Order> getOrdersAtPrice(String side, Double price) {
         Pipeline pipeline = Pipeline.create();
-
-        pipeline
-                .readFrom(Sources.<String, Order>map("orders1"))
-                .filter(entry -> entry.getValue().getSide().equals(side))
-                .filter(entry -> entry.getValue().getPrice().equals(price))
-                .filter(entry -> !entry.getValue().isMatched())
-                .map(Map.Entry::getValue)
-                .sort(ComparatorEx.comparing(Order::getOrderTime))
-                .writeTo(Sinks.list("orderListAtPrice"));
-
+        if (side.equals("BUY")){
+            pipeline
+                    .readFrom(Sources.<String, Order>map("buy-orders"))
+                    .filter(entry -> entry.getValue().getPrice().equals(price))
+                    .filter(entry -> !entry.getValue().isMatched())
+                    .map(Map.Entry::getValue)
+                    .sort(ComparatorEx.comparing(Order::getOrderTime))
+                    .writeTo(Sinks.list("orderListAtPrice"));
+        }
+        else{
+            pipeline
+                    .readFrom(Sources.<String, Order>map("sell-orders"))
+                    .filter(entry -> entry.getValue().getPrice().equals(price))
+                    .filter(entry -> !entry.getValue().isMatched())
+                    .map(Map.Entry::getValue)
+                    .sort(ComparatorEx.comparing(Order::getOrderTime))
+                    .writeTo(Sinks.list("orderListAtPrice"));
+        }
         try {
             jetInstance.newJob(pipeline).join();
             return new ArrayList<>(jetInstance.getList("orderListAtPrice"));
+
         } finally {
             jetInstance.getList("orderListAtPrice").destroy();
         }
     }
 
     public void updateOrder(Order order) {
-        IMap<String, Order> orderMap = jetInstance.getMap("orders1");
+        IMap<String, Order> buyOrderMap = jetInstance.getMap("buy-orders");
+        IMap<String, Order> sellOrderMap = jetInstance.getMap("sell-orders");
         IMap<String, Order> orderSell = jetInstance.getMap("orders_prorata_sell");
         IMap<String, Order> orderBuy = jetInstance.getMap("orders_prorata_buy");
-        orderMap.replace(order.getUUID(), order);
+        buyOrderMap.replace(order.getUUID(), order);
+        sellOrderMap.replace(order.getUUID(), order);
         orderSell.replace(order.getUUID(), order);
         orderBuy.replace(order.getUUID(), order);
         if (order.isMatched()) {
@@ -194,6 +187,8 @@ public class JetMatchService {
     }
 
     public void initialCheck() {
+        long startTime = System.nanoTime();
+
         double bestBuyPrice = getBestBuyPrice();
         double bestSellPrice = getBestSellPrice();
 
@@ -208,7 +203,11 @@ public class JetMatchService {
 
             bestBuyPrice = getBestBuyPrice();
             bestSellPrice = getBestSellPrice();
+            System.out.println("Init Check Stuck");
         }
+        long endTime = System.nanoTime();
+        double duration = (endTime - startTime)/1000000000.0;
+        System.out.println("Time check: "+duration);
     }
     public List<Order> getProrataOrder(String side) {
         Pipeline pipeline = Pipeline.create();
@@ -262,7 +261,9 @@ public class JetMatchService {
                         sellOrder.setQuantity(orderProRataList.get(0).getQuantity() - matchQuantity);
                         updateOrder(order);
                         updateOrder(sellOrder);
-                        tradeService.createTrade(order, sellOrder, matchQuantity);
+                        if(matchQuantity > 0){
+                            tradeService.createTrade(order, sellOrder, matchQuantity);
+                        }
                     }
                     if (sellOrder.getQuantity() <= PRO_RATA_MIN_ALLOCATION) {
                         break;
@@ -296,11 +297,13 @@ public class JetMatchService {
                         buyOrder.setQuantity(orderProRataList.get(0).getQuantity() - matchQuantity);
                         updateOrder(order);
                         updateOrder(buyOrder);
-                        tradeService.createTrade(order, buyOrder, matchQuantity);
+                        if(matchQuantity > 0) {
+                            tradeService.createTrade(order, buyOrder, matchQuantity);
+                        }
                     }
                     if (buyOrder.getQuantity() <= PRO_RATA_MIN_ALLOCATION) {
                         break;
-                    }
+                    }System.out.println("Pro rata Stuck");
                 }
             }
         }
@@ -308,13 +311,22 @@ public class JetMatchService {
 
     public Map<Double, Long> getTotalOrderAtPrice(String side){
         Pipeline pipeline = Pipeline.create();
-        pipeline
-                .readFrom(Sources.<String, Order>map("orders1"))
-                .filter(entry -> entry.getValue().getSide().equals(side))
-                .filter(entry -> !entry.getValue().isMatched())
-                .groupingKey(entry -> entry.getValue().getPrice())
-                .aggregate(AggregateOperations.counting())
-                .writeTo(Sinks.map("total-order"));
+        if(side.equals("BUY")){
+            pipeline
+                    .readFrom(Sources.<String, Order>map("buy-orders"))
+                    .filter(entry -> !entry.getValue().isMatched())
+                    .groupingKey(entry -> entry.getValue().getPrice())
+                    .aggregate(AggregateOperations.counting())
+                    .writeTo(Sinks.map("total-order"));
+        }
+        else{
+            pipeline
+                    .readFrom(Sources.<String, Order>map("sell-orders"))
+                    .filter(entry -> !entry.getValue().isMatched())
+                    .groupingKey(entry -> entry.getValue().getPrice())
+                    .aggregate(AggregateOperations.counting())
+                    .writeTo(Sinks.map("total-order"));
+        }
         try{
             jetInstance.newJob(pipeline).join();
             return new HashMap<>(jetInstance.getMap("total-order"));
@@ -323,10 +335,12 @@ public class JetMatchService {
             jetInstance.getMap("total-order").destroy();
         }
     }
+
     public Double getBestBuyPrice(){
         IList<Double> buyPriceList = jetInstance.getList("buy-price-list");
         return buyPriceList.get(buyPriceList.size() -1);
     }
+
     public Double getBestSellPrice(){
         IList<Double> sellPriceList = jetInstance.getList("sell-price-list");
         return sellPriceList.get(0);

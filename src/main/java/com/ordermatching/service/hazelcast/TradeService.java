@@ -1,7 +1,7 @@
 package com.ordermatching.service.hazelcast;
 
+import com.hazelcast.jet.JetInstance;
 import com.hazelcast.map.IMap;
-import com.ordermatching.config.HazelcastConfig;
 import com.ordermatching.entity.Order;
 import com.ordermatching.entity.Trade;
 import com.ordermatching.entity.TradePrice;
@@ -14,10 +14,10 @@ import java.util.stream.Collectors;
 @Service
 public class TradeService {
     @Autowired
-    private HazelcastConfig hazelcastConfig;
+    private JetInstance jetInstance;
 
     public void createTrade(Order buyOrder, Order sellOrder, double matchedQuantity){
-        IMap<String, Trade> tradeMap = hazelcastConfig.hazelcastInstance().getMap("trades");
+        IMap<String, Trade> tradeMap = jetInstance.getMap("trades");
         Trade trade = new Trade();
         String tradeUUID = UUID.randomUUID().toString();
 
@@ -33,7 +33,7 @@ public class TradeService {
     }
 
     public List<Trade> getCandlePrice(LocalDateTime time){
-        IMap<String, Trade> tradeMap = hazelcastConfig.hazelcastInstance().getMap("trades");
+        IMap<String, Trade> tradeMap = jetInstance.getMap("trades");
         List<Trade> tradeList = new ArrayList<>(tradeMap.values())
                 .stream()
                 .filter(trade -> trade.getTradeTime().isAfter(time))

@@ -1,7 +1,7 @@
 package com.ordermatching.service.hazelcast;
 
+import com.hazelcast.jet.JetInstance;
 import com.hazelcast.map.IMap;
-import com.ordermatching.config.HazelcastConfig;
 import com.ordermatching.entity.Order;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,13 +17,13 @@ public class MatchService {
     private static final Double PRO_RATA_MIN_ALLOCATION = 1.0;
 
     @Autowired
-    private HazelcastConfig hazelcastConfig;
+    private JetInstance jetInstance;
 
     @Autowired
     private TradeService tradeService;
 
     public List<Order> getAllOrders(){
-        IMap<String, Order> orderMap = hazelcastConfig.hazelcastInstance().getMap("orders");
+        IMap<String, Order> orderMap = jetInstance.getMap("orders");
         List<Order> orderList = new ArrayList<>();
         for (Order order : orderMap.values()){
             if (!order.isMatched()){
@@ -34,7 +34,7 @@ public class MatchService {
     }
 
     public List<Order> getAllOrdersBySide(String side){
-        IMap<String, Order> orderMap = hazelcastConfig.hazelcastInstance().getMap("orders");
+        IMap<String, Order> orderMap = jetInstance.getMap("orders");
         List<Order> orderListBySide = new ArrayList<>();
         for (Order order: orderMap.values()){
             if(order.getSide().equals(side) && !order.isMatched()){
@@ -83,7 +83,7 @@ public class MatchService {
     }
 
     public void updateOrder(Order order){
-        IMap<String, Order> orderMap = hazelcastConfig.hazelcastInstance().getMap("orders");
+        IMap<String, Order> orderMap = jetInstance.getMap("orders");
         Order oldOrder = orderMap.get(order.getUUID());
 
         if (oldOrder != null){

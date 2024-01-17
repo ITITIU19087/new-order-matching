@@ -6,7 +6,6 @@ import com.hazelcast.core.Hazelcast;
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.jet.Jet;
 import com.hazelcast.jet.JetInstance;
-import com.hazelcast.jet.config.JetConfig;
 import com.hazelcast.config.MapConfig;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.context.annotation.Bean;
@@ -31,7 +30,6 @@ public class HazelcastConfig {
 
     @Bean
     public JetInstance jetInstance() {
-        JetConfig jetConfig = new JetConfig();
         return Jet.newJetInstance(hazelcastConfig().getJetConfig());
     }
 
@@ -42,9 +40,9 @@ public class HazelcastConfig {
         return config;
     }
 
-    @Bean
-    public HazelcastInstance hazelcastInstance() {
-        Config config = hazelcastConfig();
-        return Hazelcast.newHazelcastInstance(config);
-    }
+//    @Bean
+//    public HazelcastInstance hazelcastInstance() {
+//        Config config = hazelcastConfig();
+//        return Hazelcast.newHazelcastInstance(config);
+//    }
 }

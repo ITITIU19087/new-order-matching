@@ -1,7 +1,7 @@
 package com.ordermatching.service.hazelcast;
 
+import com.hazelcast.jet.JetInstance;
 import com.hazelcast.map.IMap;
-import com.ordermatching.config.HazelcastConfig;
 import com.ordermatching.dto.OrderDto;
 import com.ordermatching.entity.Order;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,13 +14,13 @@ import java.util.UUID;
 @Service
 public class OrderService {
     @Autowired
-    private HazelcastConfig hazelcastConfig;
+    private JetInstance jetInstance;
 
     @Autowired
     private MatchService matchService;
 
     public void createOrder(List<OrderDto> orderList){
-        IMap<String, Order> orderMap = hazelcastConfig.hazelcastInstance().getMap("orders");
+        IMap<String, Order> orderMap = jetInstance.getMap("orders");
         for(OrderDto orderDto: orderList){
             Order order = new Order();
             String orderId = UUID.randomUUID().toString();
@@ -32,7 +32,6 @@ public class OrderService {
             order.setStatus("Success");
             orderMap.put(order.getUUID(), order);
         }
-
 
         matchService.initialCheck();
         matchService.proRataSell();

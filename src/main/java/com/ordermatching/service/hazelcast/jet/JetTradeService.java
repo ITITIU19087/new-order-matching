@@ -22,7 +22,7 @@ public class JetTradeService {
     private JetInstance jetInstance;
 
     public void createTrade(Order buyOrder, Order sellOrder, double matchedQuantity){
-        IMap<String, Trade> tradeMap = jetInstance.getMap("trade1");
+        IMap<String, Trade> tradeMap = jetInstance.getMap("trades");
         Trade trade = new Trade();
 
         trade.setUUID(UUID.randomUUID().toString());

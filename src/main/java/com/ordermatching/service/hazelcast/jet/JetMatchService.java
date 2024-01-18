@@ -336,12 +336,18 @@ public class JetMatchService {
 
     public Double getBestBuyPrice(){
         IList<Double> buyPriceList = hazelcastInstance.getList("buy-price-list");
-        return buyPriceList.get(buyPriceList.size() -1);
+        if(!buyPriceList.isEmpty()){
+            return buyPriceList.get(buyPriceList.size() -1);
+        }
+        return 0.0;
     }
 
     public Double getBestSellPrice(){
         IList<Double> sellPriceList = hazelcastInstance.getList("sell-price-list");
-        return sellPriceList.get(0);
+        if(!sellPriceList.isEmpty()){
+            return sellPriceList.get(0);
+        }
+        return 0.0;
     }
 
     public void updatePriceList(String side, Double price){

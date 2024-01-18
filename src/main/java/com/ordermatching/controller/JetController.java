@@ -36,11 +36,6 @@ public class JetController {
     @Autowired
     private JetTradeService tradeService;
 
-    @GetMapping("/all")
-    private List<Order> getAllOrders(){
-        return jetMatchService.getAllOrders();
-    }
-
     @GetMapping("/alll")
     private List<Order> getAllOrders(@RequestParam String side){
         return jetMatchService.getOrdersBySide(side);
@@ -89,9 +84,9 @@ public class JetController {
         else return jetMatchService.getBestSellPrice();
     }
 
-    @GetMapping("order-at-price")
-    public List<Order> getOrderListAtPrice(@RequestParam String side, @RequestParam Double price){
-        return jetMatchService.getOrdersAtPrice(side, price);
+    @GetMapping("order")
+    public List<Order> getOrderListAtPrice(@RequestParam String side, @RequestParam Double price, @RequestParam boolean version){
+        return jetMatchService.getOrdersAtPrice(side, price, version);
     }
 
 }

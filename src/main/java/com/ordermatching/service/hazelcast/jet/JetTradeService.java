@@ -32,7 +32,12 @@ public class JetTradeService {
         trade.setBuyOrderUUID(buyOrder.getUUID());
         trade.setSellOrderUUID(sellOrder.getUUID());
         trade.setQuantity(matchedQuantity);
-        trade.setPrice(buyOrder.getPrice());
+        if (buyOrder.getPrice() > sellOrder.getPrice()){
+            trade.setPrice(sellOrder.getPrice());
+        }
+        else {
+            trade.setPrice(buyOrder.getPrice());
+        }
 
         trade.setTradeTime(LocalDateTime.now());
 
@@ -60,12 +65,16 @@ public class JetTradeService {
     public TradePrice getCandleStickPrice(){
         LocalDateTime time = LocalDateTime.now().minusMinutes(50);
         List<Trade> tradeList = getCandlePrice(time);
-        Double maxPrice = Collections.max(tradeList, Comparator.comparing(Trade::getPrice)).getPrice();
-        Double minPrice = Collections.min(tradeList, Comparator.comparing(Trade::getPrice)).getPrice();
-        Double openPrice = Collections.min(tradeList, Comparator.comparing(Trade::getTradeTime)).getPrice();
-        Double closePrice = Collections.max(tradeList, Comparator.comparing(Trade::getTradeTime)).getPrice();
+        try{
+            Double maxPrice = Collections.max(tradeList, Comparator.comparing(Trade::getPrice)).getPrice();
+            Double minPrice = Collections.min(tradeList, Comparator.comparing(Trade::getPrice)).getPrice();
+            Double openPrice = Collections.min(tradeList, Comparator.comparing(Trade::getTradeTime)).getPrice();
+            Double closePrice = Collections.max(tradeList, Comparator.comparing(Trade::getTradeTime)).getPrice();
 
-        return new TradePrice(String.valueOf(time), openPrice, closePrice, maxPrice, minPrice);
-
+            return new TradePrice(String.valueOf(time), openPrice, closePrice, maxPrice, minPrice);
+        }
+        catch (Exception e){
+            return new TradePrice(String.valueOf(time),0.0,0.0,0.0,0.0);
+        }
     }
 }

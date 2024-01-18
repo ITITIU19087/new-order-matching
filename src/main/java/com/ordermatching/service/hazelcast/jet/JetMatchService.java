@@ -27,16 +27,6 @@ public class JetMatchService {
     @Autowired
     private JetTradeService tradeService;
 
-    public List<Order> getAllOrders() {
-        Pipeline pipeline = Pipeline.create();
-        pipeline
-                .readFrom(Sources.<String, Order>map("orders1"))
-                .filter(entry -> !entry.getValue().isMatched())
-                .map(Map.Entry::getValue)
-                .writeTo(Sinks.list("list"));
-        jetService.newJob(pipeline).join();
-        return new ArrayList<>(hazelcastInstance.getList("list"));
-    }
 
     public List<Order> getOrdersBySide(String side) {
         Pipeline pipeline = Pipeline.create();
@@ -77,11 +67,23 @@ public class JetMatchService {
         return new HashMap<>(hazelcastInstance.getMap("groupedOrdersByPrice"));
     }
 
-    public List<Order> getOrdersAtPrice(String side, Double price) {
+    public List<Order> getOrdersAtPrice(String side, Double price, boolean version2) {
+        String buyMap;
+        String sellMap;
+
+        if(version2){
+            buyMap = "buy-orders";
+            sellMap = "sell-orders";
+        }
+        else{
+            buyMap = "buyMap";
+            sellMap = "sellMap";
+        }
+
         Pipeline pipeline = Pipeline.create();
         if (side.equals("BUY")){
             pipeline
-                    .readFrom(Sources.<String, Order>map("buy-orders"))
+                    .readFrom(Sources.<String, Order>map(buyMap))
                     .filter(entry -> entry.getValue().getPrice().equals(price))
                     .map(Map.Entry::getValue)
                     .sort(ComparatorEx.comparing(Order::getOrderTime))
@@ -89,7 +91,7 @@ public class JetMatchService {
         }
         else{
             pipeline
-                    .readFrom(Sources.<String, Order>map("sell-orders"))
+                    .readFrom(Sources.<String, Order>map(sellMap))
                     .filter(entry -> entry.getValue().getPrice().equals(price))
                     .map(Map.Entry::getValue)
                     .sort(ComparatorEx.comparing(Order::getOrderTime))
@@ -110,15 +112,23 @@ public class JetMatchService {
         IMap<String, Order> matchedOrderMap = hazelcastInstance.getMap("matched-orders");
         IMap<String, Order> orderSell = hazelcastInstance.getMap("orders_prorata_sell");
         IMap<String, Order> orderBuy = hazelcastInstance.getMap("orders_prorata_buy");
+
+        IMap<String, Order> buyMap = hazelcastInstance.getMap("buyMap");
+        IMap<String, Order> sellMap = hazelcastInstance.getMap("sellMap");
+
         buyOrderMap.replace(order.getUUID(), order);
         sellOrderMap.replace(order.getUUID(), order);
         orderSell.replace(order.getUUID(), order);
         orderBuy.replace(order.getUUID(), order);
+        buyMap.replace(order.getUUID(), order);
+        sellMap.replace(order.getUUID(), order);
         if (order.isMatched()) {
             orderSell.remove(order.getUUID());
             orderBuy.remove(order.getUUID());
             buyOrderMap.remove(order.getUUID());
             sellOrderMap.remove(order.getUUID());
+            buyMap.remove(order.getUUID());
+            sellMap.remove(order.getUUID());
             matchedOrderMap.put(order.getUUID(), order);
         }
     }
@@ -174,42 +184,109 @@ public class JetMatchService {
         }
     }
 
-    public void matchOrdersUsingFifo() {
+    public void matchOrdersUsingFifo(boolean version) {
         double bestBuyPrice = getBestBuyPrice();
         double bestSellPrice = getBestSellPrice();
 
         while (bestSellPrice == bestBuyPrice) {
-            List<Order> buyOrders = getOrdersAtPrice("BUY", bestBuyPrice);
-            List<Order> sellOrders = getOrdersAtPrice("SELL", bestSellPrice);
+            List<Order> buyOrders = getOrdersAtPrice("BUY", bestBuyPrice, version);
+            List<Order> sellOrders = getOrdersAtPrice("SELL", bestSellPrice, version);
 
             matchOrders(buyOrders, sellOrders);
 
-            updatePriceList("BUY", bestBuyPrice);
-            updatePriceList("SELL", bestSellPrice);
+            updatePriceList("BUY", bestBuyPrice, version);
+            updatePriceList("SELL", bestSellPrice, version);
 
             bestBuyPrice = getBestBuyPrice();
             bestSellPrice = getBestSellPrice();
         }
     }
 
-    public void initialCheck() {
+    //version2 param: if true, get data from stored Map, else get data from pre stored Map
+    public void matchOrdersUsingFifoVer2(int executeCase) {
+        double bestBuyPrice = getBestBuyPrice();
+        double bestSellPrice = getBestSellPrice();
+
+        if (executeCase == 1) {
+            while (bestSellPrice == bestBuyPrice) {
+                List<Order> buyOrders = getOrdersAtPrice("BUY", bestBuyPrice, false);
+                List<Order> sellOrders = getOrdersAtPrice("SELL", bestSellPrice, true);
+
+                matchOrders(buyOrders, sellOrders);
+
+                updatePriceList("BUY", bestBuyPrice, false);
+                updatePriceList("SELL", bestSellPrice, true);
+
+                bestBuyPrice = getBestBuyPrice();
+                bestSellPrice = getBestSellPrice();
+            }
+        } else if (executeCase == 2) {
+            while (bestSellPrice == bestBuyPrice) {
+                List<Order> buyOrders = getOrdersAtPrice("BUY", bestBuyPrice, true);
+                List<Order> sellOrders = getOrdersAtPrice("SELL", bestSellPrice, false);
+
+                matchOrders(buyOrders, sellOrders);
+
+                updatePriceList("BUY", bestBuyPrice, true);
+                updatePriceList("SELL", bestSellPrice, false);
+
+                bestBuyPrice = getBestBuyPrice();
+                bestSellPrice = getBestSellPrice();
+            }
+        }
+    }
+
+    public void initCheckVer2(int executeCase){
+        double bestBuyPrice = getBestBuyPrice();
+        double bestSellPrice = getBestSellPrice();
+
+        if (executeCase == 1) {
+            while (bestSellPrice < bestBuyPrice) {
+                List<Order> buyOrders = getOrdersAtPrice("BUY", bestBuyPrice, false);
+                List<Order> sellOrders = getOrdersAtPrice("SELL", bestSellPrice, true);
+
+                matchOrders(buyOrders, sellOrders);
+
+                updatePriceList("BUY", bestBuyPrice, false);
+                updatePriceList("SELL", bestSellPrice, true);
+
+                bestBuyPrice = getBestBuyPrice();
+                bestSellPrice = getBestSellPrice();
+            }
+        } else if (executeCase == 2) {
+            while (bestSellPrice < bestBuyPrice) {
+                List<Order> buyOrders = getOrdersAtPrice("BUY", bestBuyPrice, true);
+                List<Order> sellOrders = getOrdersAtPrice("SELL", bestSellPrice, false);
+
+                matchOrders(buyOrders, sellOrders);
+
+                updatePriceList("BUY", bestBuyPrice, true);
+                updatePriceList("SELL", bestSellPrice, false);
+
+                bestBuyPrice = getBestBuyPrice();
+                bestSellPrice = getBestSellPrice();
+            }
+        }
+    }
+
+    public void initialCheck(boolean version) {
         double bestBuyPrice = getBestBuyPrice();
         double bestSellPrice = getBestSellPrice();
 
         while (bestSellPrice < bestBuyPrice) {
-            List<Order> buyOrders = getOrdersAtPrice("BUY", bestBuyPrice);
-            List<Order> sellOrders = getOrdersAtPrice("SELL", bestSellPrice);
+            List<Order> buyOrders = getOrdersAtPrice("BUY", bestBuyPrice, version);
+            List<Order> sellOrders = getOrdersAtPrice("SELL", bestSellPrice, version);
 
             matchOrders(buyOrders, sellOrders);
 
-            updatePriceList("BUY", bestBuyPrice);
-            updatePriceList("SELL", bestSellPrice);
+            updatePriceList("BUY", bestBuyPrice, version);
+            updatePriceList("SELL", bestSellPrice, version);
 
             bestBuyPrice = getBestBuyPrice();
             bestSellPrice = getBestSellPrice();
         }
     }
-    public List<Order> getProrataOrder(String side) {
+    public List<Order> getProRataOrder(String side) {
         Pipeline pipeline = Pipeline.create();
         try{
             if (side.equals("BUY")) {
@@ -236,14 +313,14 @@ public class JetMatchService {
         }
     }
 
-    public void proRataSell() {
-        List<Order> orderProRataList = getProrataOrder("SELL");
+    public void proRataSell(boolean version) {
+        List<Order> orderProRataList = getProRataOrder("SELL");
 
         if (!orderProRataList.isEmpty()) {
             Double bestBuyPrice = getBestBuyPrice();
             Double bestSellPrice = getBestSellPrice();
             if (bestBuyPrice.equals(bestSellPrice)) {
-                List<Order> buyOrders = getOrdersAtPrice("BUY", bestBuyPrice);
+                List<Order> buyOrders = getOrdersAtPrice("BUY", bestBuyPrice, version);
                 Order sellOrder = orderProRataList.get(0);
                 while (sellOrder.getQuantity() > 0) {
                     buyOrders.sort(Comparator.comparing(Order::getQuantity).reversed());
@@ -272,14 +349,14 @@ public class JetMatchService {
             }
         }
     }
-    public void proRataBuy() {
-        List<Order> orderProRataList = getProrataOrder("BUY");
+    public void proRataBuy(boolean version) {
+        List<Order> orderProRataList = getProRataOrder("BUY");
 
         if (!orderProRataList.isEmpty()) {
             Double bestBuyPrice = getBestBuyPrice();
             Double bestSellPrice = getBestSellPrice();
             if (bestBuyPrice.equals(bestSellPrice)) {
-                List<Order> sellOrders = getOrdersAtPrice("SELL", bestSellPrice);
+                List<Order> sellOrders = getOrdersAtPrice("SELL", bestSellPrice, version);
                 Order buyOrder = orderProRataList.get(0);
                 while (buyOrder.getQuantity() > 0) {
                     sellOrders.sort(Comparator.comparing(Order::getQuantity).reversed());
@@ -350,16 +427,41 @@ public class JetMatchService {
         return 0.0;
     }
 
-    public void updatePriceList(String side, Double price){
-        Map<Double, Long> orderList = getTotalOrderAtPrice(side);
-
-        if (!orderList.containsKey(price)){
-            if(side.equals("BUY")){
-                hazelcastInstance.getList("buy-price-list").remove(price);
-            }
-            else{
-                hazelcastInstance.getList("sell-price-list").remove(price);
+    public void updatePriceList(String side, Double price, boolean version2){
+        if(version2){
+            Map<Double, Long> orderList = getTotalOrderAtPrice(side);
+            if (!orderList.containsKey(price)){
+                if(side.equals("BUY")){
+                    hazelcastInstance.getList("buy-price-list").remove(price);
+                }
+                else{
+                    hazelcastInstance.getList("sell-price-list").remove(price);
+                }
             }
         }
+        else {
+            List<Order> orderList = getOrdersAtPrice(side, price, false);
+            if (orderList.isEmpty()){
+                if(side.equals("BUY")){
+                    hazelcastInstance.getList("buy-price-list").remove(price);
+                }
+                else{
+                    hazelcastInstance.getList("sell-price-list").remove(price);
+                }
+            }
+        }
+    }
+    public void syncOrderMap(){
+        IMap<String, Order> buyMap = hazelcastInstance.getMap("buyMap");
+        IMap<String, Order> sellMap = hazelcastInstance.getMap("sellMap");
+
+        IMap<String, Order> buyOrderMap = hazelcastInstance.getMap("buy-orders");
+        IMap<String, Order> sellOrderMap = hazelcastInstance.getMap("sell-orders");
+
+        buyOrderMap.putAll(buyMap);
+        sellOrderMap.putAll(sellMap);
+
+        buyMap.clear();
+        sellMap.clear();
     }
 }

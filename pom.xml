@@ -25,7 +25,6 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
-
         <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
@@ -49,26 +48,6 @@
         <dependency>
             <groupId>com.hazelcast.jet</groupId>
             <artifactId>hazelcast-jet</artifactId>
-            <version>4.5.4</version>
-        </dependency>
-        <!-- https://mvnrepository.com/artifact/com.datadoghq/dd-trace-api -->
-        <dependency>
-            <groupId>com.datadoghq</groupId>
-            <artifactId>dd-trace-api</artifactId>
-            <version>1.26.1</version>
-        </dependency>
-
-        <!-- https://mvnrepository.com/artifact/com.hazelcast.jet/hazelcast-jet-cdc-debezium -->
-        <dependency>
-            <groupId>com.hazelcast.jet</groupId>
-            <artifactId>hazelcast-jet-cdc-debezium</artifactId>
-            <version>4.5.4</version>
-            <scope>provided</scope>
-        </dependency>
-        <!-- https://mvnrepository.com/artifact/com.hazelcast.jet/hazelcast-jet-cdc-postgres -->
-        <dependency>
-            <groupId>com.hazelcast.jet</groupId>
-            <artifactId>hazelcast-jet-cdc-postgres</artifactId>
             <version>4.5.4</version>
         </dependency>
         <dependency>

@@ -1,7 +1,8 @@
 package com.ordermatching.service.hazelcast.jet;
 
-import com.hazelcast.internal.util.phonehome.JetInfoCollector;
+import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.jet.JetInstance;
+import com.hazelcast.jet.JetService;
 import com.hazelcast.jet.pipeline.Pipeline;
 import com.hazelcast.jet.pipeline.Sinks;
 import com.hazelcast.jet.pipeline.Sources;
@@ -14,15 +15,17 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.*;
-import java.util.stream.Collectors;
 
 @Service
 public class JetTradeService {
     @Autowired
-    private JetInstance jetInstance;
+    private HazelcastInstance hazelcastInstance;
+
+    @Autowired
+    private JetService jetService;
 
     public void createTrade(Order buyOrder, Order sellOrder, double matchedQuantity){
-        IMap<String, Trade> tradeMap = jetInstance.getMap("trades");
+        IMap<String, Trade> tradeMap = hazelcastInstance.getMap("trades");
         Trade trade = new Trade();
 
         trade.setUUID(UUID.randomUUID().toString());
@@ -45,11 +48,11 @@ public class JetTradeService {
                 .writeTo(Sinks.list("candle-trade"));
 
         try {
-            jetInstance.newJob(pipeline).join();
-            return new ArrayList<>(jetInstance.getList("candle-trade"));
+            jetService.newJob(pipeline).join();
+            return new ArrayList<>(hazelcastInstance.getList("candle-trade"));
         }
         finally {
-            jetInstance.getList("candle-trade").destroy();
+            hazelcastInstance.getList("candle-trade").destroy();
         }
 
     }

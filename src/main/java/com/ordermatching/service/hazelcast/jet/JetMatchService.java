@@ -1,8 +1,9 @@
 package com.ordermatching.service.hazelcast.jet;
 
 import com.hazelcast.collection.IList;
+import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.function.ComparatorEx;
-import com.hazelcast.jet.JetInstance;
+import com.hazelcast.jet.JetService;
 import com.hazelcast.jet.aggregate.AggregateOperations;
 import com.hazelcast.jet.pipeline.*;
 import com.hazelcast.map.IMap;
@@ -18,7 +19,10 @@ import java.util.*;
 public class JetMatchService {
     private static final Double PRO_RATA_MIN_ALLOCATION = 1.0;
     @Autowired
-    private JetInstance jetInstance;
+    private HazelcastInstance hazelcastInstance;
+
+    @Autowired
+    private JetService jetService;
 
     @Autowired
     private JetTradeService tradeService;
@@ -30,8 +34,8 @@ public class JetMatchService {
                 .filter(entry -> !entry.getValue().isMatched())
                 .map(Map.Entry::getValue)
                 .writeTo(Sinks.list("list"));
-        jetInstance.newJob(pipeline).join();
-        return new ArrayList<>(jetInstance.getList("list"));
+        jetService.newJob(pipeline).join();
+        return new ArrayList<>(hazelcastInstance.getList("list"));
     }
 
     public List<Order> getOrdersBySide(String side) {
@@ -53,10 +57,10 @@ public class JetMatchService {
                     .writeTo(Sinks.list("list"));
         }
         try {
-            jetInstance.newJob(pipeline).join();
-            return new ArrayList<>(jetInstance.getList("list"));
+            jetService.newJob(pipeline).join();
+            return new ArrayList<>(hazelcastInstance.getList("list"));
         } finally {
-            jetInstance.getList("list").destroy();
+            hazelcastInstance.getList("list").destroy();
         }
     }
 
@@ -69,8 +73,8 @@ public class JetMatchService {
                 .groupingKey(entry -> entry.getValue().getPrice())
                 .aggregate(AggregateOperations.toList())
                 .writeTo(Sinks.map("groupedOrdersByPrice"));
-        jetInstance.newJob(pipeline).join();
-        return new HashMap<>(jetInstance.getMap("groupedOrdersByPrice"));
+        jetService.newJob(pipeline).join();
+        return new HashMap<>(hazelcastInstance.getMap("groupedOrdersByPrice"));
     }
 
     public List<Order> getOrdersAtPrice(String side, Double price) {
@@ -92,20 +96,20 @@ public class JetMatchService {
                     .writeTo(Sinks.list("orderListAtPrice"));
         }
         try {
-            jetInstance.newJob(pipeline).join();
-            return new ArrayList<>(jetInstance.getList("orderListAtPrice"));
+            jetService.newJob(pipeline).join();
+            return new ArrayList<>(hazelcastInstance.getList("orderListAtPrice"));
 
         } finally {
-            jetInstance.getList("orderListAtPrice").destroy();
+            hazelcastInstance.getList("orderListAtPrice").destroy();
         }
     }
 
     public void updateOrder(Order order) {
-        IMap<String, Order> buyOrderMap = jetInstance.getMap("buy-orders");
-        IMap<String, Order> sellOrderMap = jetInstance.getMap("sell-orders");
-        IMap<String, Order> matchedOrderMap = jetInstance.getMap("matched-orders");
-        IMap<String, Order> orderSell = jetInstance.getMap("orders_prorata_sell");
-        IMap<String, Order> orderBuy = jetInstance.getMap("orders_prorata_buy");
+        IMap<String, Order> buyOrderMap = hazelcastInstance.getMap("buy-orders");
+        IMap<String, Order> sellOrderMap = hazelcastInstance.getMap("sell-orders");
+        IMap<String, Order> matchedOrderMap = hazelcastInstance.getMap("matched-orders");
+        IMap<String, Order> orderSell = hazelcastInstance.getMap("orders_prorata_sell");
+        IMap<String, Order> orderBuy = hazelcastInstance.getMap("orders_prorata_buy");
         buyOrderMap.replace(order.getUUID(), order);
         sellOrderMap.replace(order.getUUID(), order);
         orderSell.replace(order.getUUID(), order);
@@ -189,8 +193,6 @@ public class JetMatchService {
     }
 
     public void initialCheck() {
-        long startTime = System.nanoTime();
-
         double bestBuyPrice = getBestBuyPrice();
         double bestSellPrice = getBestSellPrice();
 
@@ -205,11 +207,7 @@ public class JetMatchService {
 
             bestBuyPrice = getBestBuyPrice();
             bestSellPrice = getBestSellPrice();
-            System.out.println("Init Check Stuck");
         }
-        long endTime = System.nanoTime();
-        double duration = (endTime - startTime)/1000000000.0;
-        System.out.println("Time check: "+duration);
     }
     public List<Order> getProrataOrder(String side) {
         Pipeline pipeline = Pipeline.create();
@@ -220,21 +218,21 @@ public class JetMatchService {
                         .filter(entry -> !entry.getValue().isMatched())
                         .map(Map.Entry::getValue)
                         .writeTo(Sinks.list("prorata_buy_list"));
-                jetInstance.newJob(pipeline).join();
-                return new ArrayList<>(jetInstance.getList("prorata_buy_list"));
+                jetService.newJob(pipeline).join();
+                return new ArrayList<>(hazelcastInstance.getList("prorata_buy_list"));
             } else {
                 pipeline
                         .readFrom(Sources.<String, Order>map("orders_prorata_sell"))
                         .filter(entry -> !entry.getValue().isMatched())
                         .map(Map.Entry::getValue)
                         .writeTo(Sinks.list("prorata_sell_list"));
-                jetInstance.newJob(pipeline).join();
-                return new ArrayList<>(jetInstance.getList("prorata_sell_list"));
+                jetService.newJob(pipeline).join();
+                return new ArrayList<>(hazelcastInstance.getList("prorata_sell_list"));
             }
         }
          finally {
-            jetInstance.getList("prorata_sell_list").destroy();
-            jetInstance.getList("prorata_buy_list").destroy();
+            hazelcastInstance.getList("prorata_sell_list").destroy();
+            hazelcastInstance.getList("prorata_buy_list").destroy();
         }
     }
 
@@ -328,33 +326,33 @@ public class JetMatchService {
                     .writeTo(Sinks.map("total-order"));
         }
         try{
-            jetInstance.newJob(pipeline).join();
-            return new HashMap<>(jetInstance.getMap("total-order"));
+            jetService.newJob(pipeline).join();
+            return new HashMap<>(hazelcastInstance.getMap("total-order"));
         }
         finally {
-            jetInstance.getMap("total-order").destroy();
+            hazelcastInstance.getMap("total-order").destroy();
         }
     }
 
     public Double getBestBuyPrice(){
-        IList<Double> buyPriceList = jetInstance.getList("buy-price-list");
+        IList<Double> buyPriceList = hazelcastInstance.getList("buy-price-list");
         return buyPriceList.get(buyPriceList.size() -1);
     }
 
     public Double getBestSellPrice(){
-        IList<Double> sellPriceList = jetInstance.getList("sell-price-list");
+        IList<Double> sellPriceList = hazelcastInstance.getList("sell-price-list");
         return sellPriceList.get(0);
     }
 
     public void updatePriceList(String side, Double price){
         Map<Double, Long> orderList = getTotalOrderAtPrice(side);
 
-        if (orderList.containsKey(price)){
+        if (!orderList.containsKey(price)){
             if(side.equals("BUY")){
-                jetInstance.getList("buy-price-list").remove(price);
+                hazelcastInstance.getList("buy-price-list").remove(price);
             }
             else{
-                jetInstance.getList("sell-price-list").remove(price);
+                hazelcastInstance.getList("sell-price-list").remove(price);
             }
         }
     }

@@ -1,6 +1,7 @@
 package com.ordermatching.service.hazelcast.jet;
 
 import com.hazelcast.collection.IList;
+import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.jet.JetInstance;
 import com.hazelcast.map.IMap;
 import com.ordermatching.dto.OrderDto;
@@ -17,7 +18,7 @@ import java.util.*;
 @CrossOrigin(origins = "http://localhost:3000")
 public class JetOrderService {
     @Autowired
-    private JetInstance jetInstance;
+    private HazelcastInstance hazelcastInstance;
 
     @Autowired
     private JetMatchService matchService;
@@ -39,8 +40,8 @@ public class JetOrderService {
     }
 
     public void syncPriceList(){
-        IList<Double> sellPriceList = jetInstance.getList("sell-price-list");
-        IList<Double> buyPriceList = jetInstance.getList("buy-price-list");
+        IList<Double> sellPriceList = hazelcastInstance.getList("sell-price-list");
+        IList<Double> buyPriceList = hazelcastInstance.getList("buy-price-list");
 
         if (!sellPriceList.isEmpty()){
             for (Double d: sellPriceList) {
@@ -52,15 +53,15 @@ public class JetOrderService {
                 this.buyTree.add(d);
             }
         }
-        jetInstance.getList("sell-price-list").destroy();
-        jetInstance.getList("buy-price-list").destroy();
+        hazelcastInstance.getList("sell-price-list").destroy();
+        hazelcastInstance.getList("buy-price-list").destroy();
     }
 
     public void createOrders(List<OrderDto> orderList){
-        IMap<String, Order> buyOrderMap = jetInstance.getMap("buy-orders");
-        IMap<String, Order> sellOrderMap = jetInstance.getMap("sell-orders");
-        IList<Double> sellPriceList = jetInstance.getList("sell-price-list");
-        IList<Double> buyPriceList = jetInstance.getList("buy-price-list");
+        IMap<String, Order> buyOrderMap = hazelcastInstance.getMap("buy-orders");
+        IMap<String, Order> sellOrderMap = hazelcastInstance.getMap("sell-orders");
+        IList<Double> sellPriceList = hazelcastInstance.getList("sell-price-list");
+        IList<Double> buyPriceList = hazelcastInstance.getList("buy-price-list");
         Map<String, Order> batchMap = new HashMap<>();
 
         for (OrderDto orderDto : orderList) {
@@ -82,16 +83,16 @@ public class JetOrderService {
         this.sellBatchMap.clear();
 
         matchService.initialCheck();
-        matchService.proRataSell();
-        matchService.proRataBuy();
-        matchService.matchOrdersUsingFifo();
+//        matchService.proRataSell();
+//        matchService.proRataBuy();
+//        matchService.matchOrdersUsingFifo();
 
         service.notifyOrderCreation(matchService.getTotalOrderAtPrice("BUY"), matchService.getTotalOrderAtPrice("SELL"));
     }
 
     public Order convertOrder(OrderDto orderDto){
-        IMap<String, Order> orderMap = jetInstance.getMap("orders_prorata_buy");
-        IMap<String, Order> orderSellMap = jetInstance.getMap("orders_prorata_sell");
+        IMap<String, Order> orderMap = hazelcastInstance.getMap("orders_prorata_buy");
+        IMap<String, Order> orderSellMap = hazelcastInstance.getMap("orders_prorata_sell");
 
         Order order = new Order();
         String orderId = UUID.randomUUID().toString();

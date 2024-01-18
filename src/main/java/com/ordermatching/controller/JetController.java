@@ -1,11 +1,10 @@
 package com.ordermatching.controller;
 
-import com.hazelcast.jet.JetInstance;
+import com.hazelcast.core.HazelcastInstance;
 import com.ordermatching.dto.OrderDto;
 import com.ordermatching.entity.Order;
 import com.ordermatching.entity.Trade;
 import com.ordermatching.entity.TradePrice;
-import com.ordermatching.service.hazelcast.TradeService;
 import com.ordermatching.service.hazelcast.jet.JetMatchService;
 import com.ordermatching.service.hazelcast.jet.JetOrderService;
 import com.ordermatching.service.hazelcast.jet.JetTradeService;
@@ -23,7 +22,7 @@ import java.util.Map;
 public class JetController {
 
     @Autowired
-    private JetInstance jetInstance;
+    private HazelcastInstance hazelcastInstance;
 
     @Autowired
     private JetMatchService jetMatchService;
@@ -79,6 +78,20 @@ public class JetController {
 
     @GetMapping("trades")
     public Map<String, Trade> getTrade(){
-        return jetInstance.getMap("trades");
+        return hazelcastInstance.getMap("trades");
     }
+
+    @GetMapping("best-price")
+    public Double getBestPrice(@RequestParam String side){
+        if (side.equals("BUY")){
+            return jetMatchService.getBestBuyPrice();
+        }
+        else return jetMatchService.getBestSellPrice();
+    }
+
+    @GetMapping("order-at-price")
+    public List<Order> getOrderListAtPrice(@RequestParam String side, @RequestParam Double price){
+        return jetMatchService.getOrdersAtPrice(side, price);
+    }
+
 }

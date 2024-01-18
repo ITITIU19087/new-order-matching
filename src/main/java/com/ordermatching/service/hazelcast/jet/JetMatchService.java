@@ -79,7 +79,6 @@ public class JetMatchService {
             pipeline
                     .readFrom(Sources.<String, Order>map("buy-orders"))
                     .filter(entry -> entry.getValue().getPrice().equals(price))
-                    .filter(entry -> !entry.getValue().isMatched())
                     .map(Map.Entry::getValue)
                     .sort(ComparatorEx.comparing(Order::getOrderTime))
                     .writeTo(Sinks.list("orderListAtPrice"));
@@ -88,7 +87,6 @@ public class JetMatchService {
             pipeline
                     .readFrom(Sources.<String, Order>map("sell-orders"))
                     .filter(entry -> entry.getValue().getPrice().equals(price))
-                    .filter(entry -> !entry.getValue().isMatched())
                     .map(Map.Entry::getValue)
                     .sort(ComparatorEx.comparing(Order::getOrderTime))
                     .writeTo(Sinks.list("orderListAtPrice"));
@@ -105,6 +103,7 @@ public class JetMatchService {
     public void updateOrder(Order order) {
         IMap<String, Order> buyOrderMap = jetInstance.getMap("buy-orders");
         IMap<String, Order> sellOrderMap = jetInstance.getMap("sell-orders");
+        IMap<String, Order> matchedOrderMap = jetInstance.getMap("matched-orders");
         IMap<String, Order> orderSell = jetInstance.getMap("orders_prorata_sell");
         IMap<String, Order> orderBuy = jetInstance.getMap("orders_prorata_buy");
         buyOrderMap.replace(order.getUUID(), order);
@@ -114,6 +113,9 @@ public class JetMatchService {
         if (order.isMatched()) {
             orderSell.remove(order.getUUID());
             orderBuy.remove(order.getUUID());
+            buyOrderMap.remove(order.getUUID());
+            sellOrderMap.remove(order.getUUID());
+            matchedOrderMap.put(order.getUUID(), order);
         }
     }
 
@@ -314,7 +316,6 @@ public class JetMatchService {
         if(side.equals("BUY")){
             pipeline
                     .readFrom(Sources.<String, Order>map("buy-orders"))
-                    .filter(entry -> !entry.getValue().isMatched())
                     .groupingKey(entry -> entry.getValue().getPrice())
                     .aggregate(AggregateOperations.counting())
                     .writeTo(Sinks.map("total-order"));
@@ -322,7 +323,6 @@ public class JetMatchService {
         else{
             pipeline
                     .readFrom(Sources.<String, Order>map("sell-orders"))
-                    .filter(entry -> !entry.getValue().isMatched())
                     .groupingKey(entry -> entry.getValue().getPrice())
                     .aggregate(AggregateOperations.counting())
                     .writeTo(Sinks.map("total-order"));
@@ -347,9 +347,9 @@ public class JetMatchService {
     }
 
     public void updatePriceList(String side, Double price){
-        List<Order> orderList = getOrdersAtPrice(side, price);
+        Map<Double, Long> orderList = getTotalOrderAtPrice(side);
 
-        if (orderList.isEmpty()){
+        if (orderList.containsKey(price)){
             if(side.equals("BUY")){
                 jetInstance.getList("buy-price-list").remove(price);
             }

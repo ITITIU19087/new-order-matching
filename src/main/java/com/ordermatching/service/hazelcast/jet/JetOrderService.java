@@ -63,8 +63,11 @@ public class JetOrderService {
         IList<Double> sellPriceList = hazelcastInstance.getList("sell-price-list");
         IList<Double> buyPriceList = hazelcastInstance.getList("buy-price-list");
 
+        Double bestBuyPrice = matchService.getBestBuyPrice();
+        Double bestSellPrice = matchService.getBestSellPrice();
+
         for (OrderDto orderDto : orderList) {
-            convertOrder(orderDto);
+            convertOrder(orderDto, bestBuyPrice, bestSellPrice);
         }
         syncPriceList();
         for(Double d: this.buyTree){
@@ -80,17 +83,19 @@ public class JetOrderService {
         sellOrderMap.putAll(this.sellBatchMap);
         this.sellBatchMap.clear();
 
-        matchService.initialCheck();
-        matchService.proRataSell();
-        matchService.proRataBuy();
-        matchService.matchOrdersUsingFifo();
-
-        service.notifyOrderCreation(matchService.getTotalOrderAtPrice("BUY"), matchService.getTotalOrderAtPrice("SELL"));
+//        matchService.initialCheck();
+//        matchService.proRataSell();
+//        matchService.proRataBuy();
+//        matchService.matchOrdersUsingFifo();
+//
+//        service.notifyOrderCreation(matchService.getTotalOrderAtPrice("BUY"), matchService.getTotalOrderAtPrice("SELL"));
     }
 
-    public Order convertOrder(OrderDto orderDto){
+    public Order convertOrder(OrderDto orderDto, Double bestBuyPrice, Double bestSellPrice){
         IMap<String, Order> orderMap = hazelcastInstance.getMap("orders_prorata_buy");
         IMap<String, Order> orderSellMap = hazelcastInstance.getMap("orders_prorata_sell");
+        IMap<String, Order> buyMap = hazelcastInstance.getMap("buyMap");
+        IMap<String, Order> sellMap = hazelcastInstance.getMap("sellMap");
 
         Order order = new Order();
         String orderId = UUID.randomUUID().toString();
@@ -104,15 +109,25 @@ public class JetOrderService {
             if(orderDto.getQuantity() > 150){
                 orderMap.put(order.getUUID(), order);
             }
+            if(orderDto.getPrice() > bestBuyPrice && bestBuyPrice != 0){
+                buyMap.put(order.getUUID(), order);
+            }
+            else{
+                this.buyBatchMap.put(order.getUUID(), order);
+            }
             this.buyTree.add(orderDto.getPrice());
-            this.buyBatchMap.put(order.getUUID(), order);
         }
         else{
             if(orderDto.getQuantity() > 150){
                 orderSellMap.put(order.getUUID(), order);
             }
+            if (orderDto.getPrice() < bestSellPrice){
+                sellMap.put(order.getUUID(), order);
+            }
+            else {
+                this.sellBatchMap.put(order.getUUID(), order);
+            }
             this.sellTree.add(orderDto.getPrice());
-            this.sellBatchMap.put(order.getUUID(), order);
         }
         return order;
     }

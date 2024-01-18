@@ -1,0 +1,14 @@
+  buyMap: all new buy orders has better price than current best buy price (orders in buy-orders)
+  sellMap: all new sell orders has lower price than current best sell price (orders in sell-orders)
+  Should check if buyMap and sellMap is empty or not, there are 4 cases need to be handled:
+  1. Both buyMap and sellMap are empty => previous best price still is best price => the gap is unchanged.
+  2. Both buyMap and sellMap are not empty => bestPrices of both sides are now changed.
+      All orders need to be processed are in buyMap and sellMap. Config algorithms to query these maps.
+  3. buyMap is empty but sellMap is not. => bestBuyPrice did not change, but now the gap is change (due to the change of bestSellPrice)
+      Need to check the gap (new bestSellPrice - bestBuyPrice) :
+          - If the gap still > 0 => The gap is shortened, no match executed. => Store all data in sellMap to sell-orders.
+          - If the gap < 0 => The gap is fulfilled => match process executes.
+  4. sellMap is empty but buyMap is not => bestSellPrice did not change, but not the gap is change (due to the change of bestBuyPrice)
+      Need to check the gap (bestSellPrice - new bestBuyPrice):
+          - If the gap still > 0. The gap is shortened, no match executed. => Store all data in sellMap to sell-orders.
+          - If the gap < 0 => The gap is fulfilled => match process executes.

@@ -63,7 +63,7 @@ public class JetTradeService {
     }
 
     public TradePrice getCandleStickPrice(){
-        LocalDateTime time = LocalDateTime.now().minusMinutes(50);
+        LocalDateTime time = LocalDateTime.now().minusSeconds(40);
         List<Trade> tradeList = getCandlePrice(time);
         try{
             Double maxPrice = Collections.max(tradeList, Comparator.comparing(Trade::getPrice)).getPrice();

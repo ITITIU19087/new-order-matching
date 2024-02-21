@@ -106,6 +106,8 @@ public class JetOrderService {
     }
     public void processRequest ( boolean isBuyEmpty, boolean isSellEmpty){
         if (!isBuyEmpty && !isSellEmpty) {
+            System.out.println("Case 0: Triggered");
+
             matchService.initialCheck(false);
             matchService.proRataSell(false);
             matchService.proRataBuy(false);
@@ -113,36 +115,56 @@ public class JetOrderService {
             matchService.syncOrderMap();
         }
         if (!isBuyEmpty && isSellEmpty) {
+            System.out.println("Case 1: Triggered");
+
             Double bestBuyPrice = matchService.getBestBuyPrice();
             Double bestSellPrice = matchService.getBestSellPrice();
-             if (bestSellPrice > bestBuyPrice) {
-                 matchService.syncOrderMap();
-             } else if (bestBuyPrice.equals(bestSellPrice)) {
-                 matchService.proRataSell(true);
-                 matchService.matchOrdersUsingFifoVer2(1);
-                 matchService.syncOrderMap();
-             } else {
+//             if (bestSellPrice > bestBuyPrice) {
+//                 matchService.syncOrderMap();
+//             } else if (bestBuyPrice.equals(bestSellPrice)) {
+//                 matchService.proRataSell(true);
+//                 matchService.matchOrdersUsingFifoVer2(1);
+//                 matchService.syncOrderMap();
+//             } else {
+//                 matchService.initCheckVer2(1);
+//                 matchService.proRataSell(true);
+//                 matchService.matchOrdersUsingFifoVer2(1);
+//                 matchService.syncOrderMap();
+//             }
+             if (bestBuyPrice > bestSellPrice){
                  matchService.initCheckVer2(1);
-                 matchService.proRataSell(true);
-                 matchService.matchOrdersUsingFifoVer2(1);
-                 matchService.syncOrderMap();
              }
+            matchService.proRataSell(true);
+            matchService.matchOrdersUsingFifoVer2(1);
+            matchService.syncOrderMap();
 
         } else if (isBuyEmpty && !isSellEmpty) {
+            System.out.println("Case 2: Triggered");
             Double bestBuyPrice = matchService.getBestBuyPrice();
             Double bestSellPrice = matchService.getBestSellPrice();
-            if (bestSellPrice > bestBuyPrice) {
-                matchService.syncOrderMap();
-            } else if (bestBuyPrice.equals(bestSellPrice)) {
-                matchService.proRataBuy(true);
-                matchService.matchOrdersUsingFifoVer2(2);
-                matchService.syncOrderMap();
-            } else {
+            System.out.println("BBP: " + bestBuyPrice + " BSP: "+ bestSellPrice);
+//            if (bestSellPrice > bestBuyPrice) {
+//                matchService.syncOrderMap();
+//            } else if (bestBuyPrice.equals(bestSellPrice)) {
+//                matchService.proRataBuy(true);
+//                matchService.matchOrdersUsingFifoVer2(2);
+//                matchService.syncOrderMap();
+//            } else {
+//                matchService.initCheckVer2(2);
+//                matchService.proRataBuy(true);
+//                matchService.matchOrdersUsingFifoVer2(2);
+//                matchService.syncOrderMap();
+//                //this
+//            }
+            if (bestBuyPrice > bestSellPrice){
                 matchService.initCheckVer2(2);
-                matchService.proRataBuy(true);
-                matchService.matchOrdersUsingFifoVer2(2);
-                matchService.syncOrderMap();
             }
+//            matchService.proRataSell(true);
+            matchService.matchOrdersUsingFifoVer2(2);
+            matchService.syncOrderMap();
+        }
+        else{
+            System.out.println("default case");
         }
     }
 
@@ -184,3 +206,5 @@ public class JetOrderService {
         return order;
     }
 }
+
+//TODO: Fix Pro Rata after evaluate, prepare another client for FE, prepare kafka for demo

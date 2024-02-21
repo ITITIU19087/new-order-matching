@@ -43,7 +43,7 @@ public class TradeService {
     }
 
     public TradePrice getCandleStickPrice(){
-        LocalDateTime time = LocalDateTime.now().minusMinutes(2);
+        LocalDateTime time = LocalDateTime.now().minusSeconds(26);
         List<Trade> tradeList = getCandlePrice(time);
         Double    maxPrice = Collections.max(tradeList, Comparator.comparing(Trade::getPrice)).getPrice();
         Double    minPrice = Collections.min(tradeList, Comparator.comparing(Trade::getPrice)).getPrice();

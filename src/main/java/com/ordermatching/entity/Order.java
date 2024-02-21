@@ -1,5 +1,6 @@
 package com.ordermatching.entity;
 
+import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
@@ -32,4 +33,5 @@ public class Order implements Serializable{
     @ManyToOne
     @JoinColumn(name = "trade_orders")
     private Trade trade;
+
 }

@@ -431,6 +431,8 @@ public class NewJetMatchService {
             List<Order> buyOrders = getOrdersAtPrice("BUY", bestBuyPrice, isWaitingStorage);
             Order sellOrder = largeSellOrder.get(0);
             while(sellOrder.getQuantity() > 0){
+                List<Integer> matchedList = new ArrayList<>();
+                System.out.println("first size: "+ matchedList.size());
                 buyOrders.sort(Comparator.comparing(Order::getQuantity).reversed());
                 double totalBuyQuantity = buyOrders.stream().mapToDouble(Order::getQuantity).sum();
                 double totalSellQuantity = sellOrder.getQuantity();
@@ -441,7 +443,9 @@ public class NewJetMatchService {
 
                     if (proRatedVolume >= PRO_RATA_MIN_ALLOCATION) {
                         matchQuantity = (int) Math.floor(proRatedVolume);
+                        matchedList.add(matchQuantity);
                     }
+                    System.out.println("Matched Quantity: " + matchQuantity);
                     order.setQuantity(order.getQuantity() - matchQuantity);
                     sellOrder.setQuantity(largeSellOrder.get(0).getQuantity() - matchQuantity);
                     updateOrder(order);
@@ -450,15 +454,57 @@ public class NewJetMatchService {
                         tradeService.createTrade(order, sellOrder, matchQuantity);
                     }
                 }
-                if(sellOrder.getQuantity() <= PRO_RATA_MIN_ALLOCATION){
+                System.out.println("MatchedList: " + matchedList.size());
+                if(sellOrder.getQuantity() <= PRO_RATA_MIN_ALLOCATION || matchedList.isEmpty()){
                     largeSellOrder.remove(sellOrder);
+                    hazelcastInstance.getMap("large_sell_orders").remove(sellOrder.getUUID());
                     break;
                 }
             }
         }
     }
 
+    public void proRataBuyExe(int executionCode){
+        boolean isWaitingStorage = false;
+        if(executionCode == 2){
+            isWaitingStorage = true;
+        }
+        List<Order> largeBuyOrder = getProRataOrder("BUY");
+        Double bestSellPrice = getBestPrice("SELL");
+        if(!largeBuyOrder.isEmpty() && bestSellPrice.equals(largeBuyOrder.get(0).getPrice())){
+            List<Order> sellOrders = getOrdersAtPrice("SELL", bestSellPrice, isWaitingStorage);
+            Order buyOrder = largeBuyOrder.get(0);
+            while(buyOrder.getQuantity() > 0){
+                List<Integer> matchedList = new ArrayList<>();
+                System.out.println("first size: "+ matchedList.size());
+                sellOrders.sort(Comparator.comparing(Order::getQuantity).reversed());
+                double totalBuyQuantity = sellOrders.stream().mapToDouble(Order::getQuantity).sum();
+                double totalSellQuantity = buyOrder.getQuantity();
+                for(Order order : sellOrders){
+                    double ratio = order.getQuantity() / totalBuyQuantity;
+                    double proRatedVolume = ratio * totalSellQuantity;
+                    int matchQuantity = 0;
 
+                    if (proRatedVolume >= PRO_RATA_MIN_ALLOCATION) {
+                        matchQuantity = (int) Math.floor(proRatedVolume);
+                        matchedList.add(matchQuantity);
+                    }
+                    order.setQuantity(order.getQuantity() - matchQuantity);
+                    buyOrder.setQuantity(largeBuyOrder.get(0).getQuantity() - matchQuantity);
+                    updateOrder(order);
+                    updateOrder(buyOrder);
+                    if(matchQuantity > 0){
+                        tradeService.createTrade(order, buyOrder, matchQuantity);
+                    }
+                }
+                if(buyOrder.getQuantity() <= PRO_RATA_MIN_ALLOCATION || matchedList.isEmpty()){
+                    largeBuyOrder.remove(buyOrder);
+                    hazelcastInstance.getMap("large_buy_orders").remove(buyOrder.getUUID());
+                    break;
+                }
+            }
+        }
+    }
 
     //TODO: Implementations of matching algorithms (Pro Rata), some more tests for FIFO and initCheck, and aggregated data for waiting orders
     //TODO: Pro Rata should be applied for very large order

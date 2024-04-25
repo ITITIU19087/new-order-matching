@@ -81,4 +81,13 @@ public class TestController {
     }
 
 
+    @GetMapping("trade")
+    public Object getTrade(){
+        return hazelcastInstance.getMap("trades");
+    }
+
+    @GetMapping("matched")
+    public Object getMatched(){
+        return hazelcastInstance.getMap("matched_orders");
+    }
 }

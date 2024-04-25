@@ -168,6 +168,7 @@ public class NewJetOrderService {
 
 
         matchService.aggressiveOrderCheck(executionCode);
+        matchService.proRataBuyExe(executionCode);
         matchService.proRataSellExe(executionCode);
         matchService.fifoExe(executionCode);
 
